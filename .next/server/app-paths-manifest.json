@@ -1,8 +1,0 @@
-{
-  "/(workspace)/entries/[id]/page": "app/(workspace)/entries/[id]/page.js",
-  "/(workspace)/entries/page": "app/(workspace)/entries/page.js",
-  "/(workspace)/filtering/page": "app/(workspace)/filtering/page.js",
-  "/(workspace)/initial-evaluation/page": "app/(workspace)/initial-evaluation/page.js",
-  "/(workspace)/final-evaluation/page": "app/(workspace)/final-evaluation/page.js",
-  "/(workspace)/tie-breaking/page": "app/(workspace)/tie-breaking/page.js"
-}
