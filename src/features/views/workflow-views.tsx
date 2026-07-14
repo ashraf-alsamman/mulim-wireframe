@@ -316,6 +316,7 @@ export function FinalEvaluationView() {
   const [scores, setScores] = useState<CriterionScores>(existing?.scores ?? emptyScores);
   const [comments, setComments] = useState(existing?.comments ?? "");
   const [calculationOpen, setCalculationOpen] = useState(false);
+  const [evaluationOpen, setEvaluationOpen] = useState(false);
   const editable = can(role, "submitFinalEvaluation") && !settings.locked;
   const total = criteria.reduce((sum, criterion) => sum + scores[criterion.id], 0);
 
@@ -380,56 +381,79 @@ export function FinalEvaluationView() {
             label={language === "ar" ? "الأعمال التي عدت التقييم الأولي" : "Entries that passed initial evaluation"}
             entries={eligibleEntries}
             selectedEntryId={entry.id}
-            onSelect={setEntryId}
+            onSelect={(selectedEntryId) => {
+              setEntryId(selectedEntryId);
+              setEvaluationOpen(true);
+            }}
             maxScore={maxScore}
             showInitialScore
           />
-          <div className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
-            <div className="space-y-2">
-              <Label htmlFor="final-evaluator-select">{language === "ar" ? "المقيم" : "Evaluator"}</Label>
-              <Select id="final-evaluator-select" value={activeEvaluatorId} onChange={(event) => setEvaluatorId(event.target.value)}>
-                {committee.members.map((member) => {
-                  const evaluator = evaluators.find((item) => item.id === member.evaluatorId);
-                  return (
-                    <option key={member.evaluatorId} value={member.evaluatorId}>
-                      {evaluator?.fullName ?? member.evaluatorId} · {member.weight}%
-                    </option>
-                  );
-                })}
-              </Select>
-            </div>
-            <div className="sketch-note p-3 text-sm">
-              <p className="font-bold text-[var(--ink)]">{language === "ar" ? "شرط الظهور في القائمة" : "List rule"}</p>
-              <p className="mt-1 text-[var(--ink-soft)]">
-                {Math.round(initialPassRate * 100)}% = {passThreshold} / {maxScore}
-              </p>
-            </div>
-          </div>
         </CardContent>
       </Card>
 
-      <EvaluationPanel
-        language={language}
+      <Dialog
+        open={evaluationOpen}
+        onOpenChange={(open) => {
+          setEvaluationOpen(open);
+          if (!open) {
+            setCalculationOpen(false);
+          }
+        }}
         title={t(language, "finalEvaluation")}
-        entry={entry}
-        evaluatorName={evaluators.find((item) => item.id === activeEvaluatorId)?.fullName ?? activeEvaluatorId}
-        total={total}
-        maxScore={maxScore}
-        scores={scores}
-        comments={comments}
-        criteria={criteria}
-        editable={editable}
-        onScore={changeScore}
-        onComments={setComments}
-        onDraft={() => persist(false)}
-        onSubmit={() => persist(true)}
-        extraAction={
-          <Button variant="secondary" onClick={() => setCalculationOpen(true)}>
-            <Calculator className="h-4 w-4" />
-            {t(language, "calculation")}
-          </Button>
-        }
-      />
+        className="w-[min(96vw,1180px)]"
+      >
+        <div className="space-y-5">
+          <Card>
+            <CardHeader>
+              <CardTitle>{language === "ar" ? "اختيار المقيم" : "Choose evaluator"}</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
+              <div className="space-y-2">
+                <Label htmlFor="final-evaluator-select">{language === "ar" ? "المقيم" : "Evaluator"}</Label>
+                <Select id="final-evaluator-select" value={activeEvaluatorId} onChange={(event) => setEvaluatorId(event.target.value)}>
+                  {committee.members.map((member) => {
+                    const evaluator = evaluators.find((item) => item.id === member.evaluatorId);
+                    return (
+                      <option key={member.evaluatorId} value={member.evaluatorId}>
+                        {evaluator?.fullName ?? member.evaluatorId} · {member.weight}%
+                      </option>
+                    );
+                  })}
+                </Select>
+              </div>
+              <div className="sketch-note p-3 text-sm">
+                <p className="font-bold text-[var(--ink)]">{language === "ar" ? "شرط دخول النهائي" : "Final evaluation rule"}</p>
+                <p className="mt-1 text-[var(--ink-soft)]">
+                  {Math.round(initialPassRate * 100)}% = {passThreshold} / {maxScore}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <EvaluationPanel
+            language={language}
+            title={language === "ar" ? "تقييم العمل المختار" : "Evaluate selected entry"}
+            entry={entry}
+            evaluatorName={evaluators.find((item) => item.id === activeEvaluatorId)?.fullName ?? activeEvaluatorId}
+            total={total}
+            maxScore={maxScore}
+            scores={scores}
+            comments={comments}
+            criteria={criteria}
+            editable={editable}
+            onScore={changeScore}
+            onComments={setComments}
+            onDraft={() => persist(false)}
+            onSubmit={() => persist(true)}
+            extraAction={
+              <Button variant="secondary" onClick={() => setCalculationOpen(true)}>
+                <Calculator className="h-4 w-4" />
+                {t(language, "calculation")}
+              </Button>
+            }
+          />
+        </div>
+      </Dialog>
 
       <Dialog open={calculationOpen} onOpenChange={setCalculationOpen} title={t(language, "calculation")}>
         <WeightedScoreBreakdown
