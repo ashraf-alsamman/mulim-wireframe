@@ -126,11 +126,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   const sidebar = (
-    <aside className="flex h-full w-72 flex-col border-e border-white/10 bg-navy-900 text-white">
-      <div className="border-b border-white/10 p-5">
-        <p className="text-xs font-bold uppercase tracking-wider text-gulf-blue">{language === "ar" ? "لوحة اللجان" : "Committee Console"}</p>
+    <aside className="sketch-paper flex h-full w-72 flex-col border-e-2 border-[var(--line)] text-[var(--ink)]">
+      <div className="sketch-doodle border-b-2 border-dashed border-[var(--muted-line)] p-5">
+        <p className="text-xs font-bold uppercase tracking-wider text-[var(--ink)]">{language === "ar" ? "لوحة اللجان" : "Committee Console"}</p>
         <h1 className="mt-2 text-lg font-bold leading-6">{t(language, "appName")}</h1>
-        <p className="mt-3 text-xs text-white/65">{roleLabels[role][language]}</p>
+        <p className="mt-3 text-xs text-[var(--graphite)]">{roleLabels[role][language]}</p>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         {navItems.map((item) => {
@@ -144,8 +144,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               href={item.href}
               onClick={() => setSidebarOpen(false)}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold text-white/75 transition hover:bg-white/10 hover:text-white",
-                active && "bg-white text-navy-900 hover:bg-white hover:text-navy-900",
+                "flex items-center gap-3 rounded-[12px_10px_14px_9px] border-2 border-transparent px-3 py-2.5 text-sm font-bold text-[var(--ink-soft)] transition hover:border-[var(--line)] hover:bg-[var(--paper-warm)] hover:text-[var(--ink)]",
+                active && "border-[var(--line)] bg-[var(--paper-soft)] text-[var(--ink)] shadow-[2px_2px_0_rgba(0,0,0,0.14)]",
                 dimmed && "opacity-55"
               )}
             >
@@ -159,26 +159,26 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
+    <div className="sketch-app min-h-screen text-[var(--ink)]">
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex">{sidebar}</div>
       {sidebarOpen ? (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <button className="absolute inset-0 bg-navy-900/50" aria-label="Close menu" onClick={() => setSidebarOpen(false)} />
+          <button className="absolute inset-0 bg-[rgba(0,0,0,0.34)]" aria-label="Close menu" onClick={() => setSidebarOpen(false)} />
           <div className="relative h-full w-72">{sidebar}</div>
         </div>
       ) : null}
       <div className="lg:ps-72">
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:px-6">
+        <header className="sketch-paper sticky top-0 z-30 border-b-2 border-dashed border-[var(--muted-line)] px-4 py-3 backdrop-blur lg:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
                 <Menu className="h-5 w-5" />
               </Button>
               <div>
-                <p className="text-xs font-semibold text-slate-500">
+                <p className="text-xs font-bold text-[var(--graphite)]">
                   {t(language, "dashboard")} / {t(language, activeItem.key)}
                 </p>
-                <h2 className="text-xl font-bold text-navy-900">{t(language, activeItem.key)}</h2>
+                <h2 className="text-xl font-bold text-[var(--ink)]">{t(language, activeItem.key)}</h2>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -188,7 +188,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Button variant="secondary" size="icon" onClick={() => setNotificationsOpen(true)} aria-label={t(language, "notifications")}>
                   <Bell className="h-4 w-4" />
                   {unreadCount > 0 ? (
-                    <span className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-burgundy-700 text-[10px] text-white">
+                    <span className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-[999px_820px_940px_840px] border-2 border-[var(--line)] bg-[var(--ink)] text-[10px] text-[var(--paper-soft)]">
                       {unreadCount}
                     </span>
                   ) : null}
@@ -229,16 +229,16 @@ export function AppShell({ children }: { children: ReactNode }) {
           {notifications.map((item) => (
             <button
               key={item.id}
-              className="w-full rounded-lg border border-slate-200 p-4 text-start hover:bg-slate-50"
+              className="sketch-note w-full p-4 text-start hover:bg-[var(--paper-warm)]"
               onClick={() => markNotificationRead(item.id)}
             >
               <div className="flex items-center justify-between gap-3">
-                <p className="font-bold text-navy-900">{item.title[language]}</p>
+                <p className="font-bold text-[var(--ink)]">{item.title[language]}</p>
                 <Badge tone={item.read ? "neutral" : item.tone === "danger" ? "danger" : item.tone === "success" ? "success" : "warning"}>
                   {item.read ? "Read" : "New"}
                 </Badge>
               </div>
-              <p className="mt-1 text-sm text-slate-500">{item.body[language]}</p>
+              <p className="mt-1 text-sm text-[var(--graphite)]">{item.body[language]}</p>
             </button>
           ))}
         </div>
@@ -249,10 +249,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             key={toast.id}
             onClick={() => dismissToast(toast.id)}
             className={cn(
-              "flex w-full items-center justify-between gap-3 rounded-lg border p-4 text-start text-sm font-semibold shadow-soft",
-              toast.tone === "success" && "border-emerald-200 bg-emerald-50 text-emerald-800",
-              toast.tone === "error" && "border-red-200 bg-red-50 text-red-800",
-              toast.tone === "info" && "border-sky-200 bg-sky-50 text-sky-800"
+              "sketch-note flex w-full items-center justify-between gap-3 p-4 text-start text-sm font-bold",
+              toast.tone === "success" && "bg-[var(--paper-soft)] text-[var(--ink)]",
+              toast.tone === "error" && "bg-[var(--paper-soft)] text-[var(--ink)]",
+              toast.tone === "info" && "bg-[var(--paper-soft)] text-[var(--ink)]"
             )}
           >
             <span>{toast.message}</span>

@@ -33,7 +33,7 @@ export function WinnersView() {
     {
       key: "rank",
       header: t(language, "rank"),
-      cell: (row) => <span className="text-lg font-bold text-burgundy-700">#{row.rank}</span>
+      cell: (row) => <span className="text-lg font-bold text-[var(--ink)]">#{row.rank}</span>
     },
     {
       key: "entry",
@@ -87,7 +87,7 @@ export function WinnersView() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
+      <div className="sketch-card flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="text-sm font-semibold text-slate-500">{language === "ar" ? "الفائزون الإجماليون وحسب المسار" : "Overall and track winners"}</p>
           <p className="text-3xl font-bold text-navy-900">{ranked.length}</p>
@@ -119,13 +119,13 @@ export function AnnouncementView() {
   }
 
   return (
-    <div className="relative min-h-[calc(100vh-140px)] overflow-hidden rounded-lg bg-navy-900 p-8 text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(86,166,214,0.35),transparent_32%),radial-gradient(circle_at_80%_30%,rgba(159,36,70,0.3),transparent_30%)]" />
+    <div className="sketch-card relative min-h-[calc(100vh-140px)] overflow-hidden p-8 text-[var(--ink)]">
+      <div className="absolute inset-0 sketch-paper" />
       <div className="pointer-events-none absolute inset-0">
         {Array.from({ length: 40 }, (_, dot) => (
           <span
             key={dot}
-            className="absolute h-2 w-2 animate-bounce rounded-sm bg-gulf-gold"
+            className="absolute h-2 w-2 animate-bounce rounded-[4px_2px_5px_3px] border border-[var(--line)] bg-[var(--ink)]"
             style={{
               insetInlineStart: `${(dot * 17) % 100}%`,
               top: `${(dot * 23) % 100}%`,
@@ -135,10 +135,10 @@ export function AnnouncementView() {
         ))}
       </div>
       <div className="relative z-10 flex min-h-[70vh] flex-col items-center justify-center text-center">
-        <Trophy className="h-16 w-16 text-gulf-gold" />
-        <p className="mt-6 text-lg font-semibold text-gulf-blue">{track ? localized(language, track.name) : winner.trackId}</p>
+        <Trophy className="h-16 w-16 text-[var(--ink)]" />
+        <p className="mt-6 text-lg font-bold text-[var(--ink)]">{track ? localized(language, track.name) : winner.trackId}</p>
         <h1 className="mt-4 text-5xl font-bold md:text-7xl">{winner.participantName}</h1>
-        <p className="mt-4 text-2xl text-white/85">{winner.title}</p>
+        <p className="mt-4 text-2xl text-[var(--ink-soft)]">{winner.title}</p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Badge tone="burgundy">#{winner.rank}</Badge>
           <Badge tone="success">{winner.participantCountry}</Badge>
@@ -258,21 +258,21 @@ export function ReportsView() {
           </div>
         </CardContent>
       </Card>
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="sketch-table overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-100 text-sm">
-            <thead className="bg-slate-50 text-slate-600">
+          <table className="min-w-full divide-y-2 divide-dashed divide-[var(--muted-line)] text-sm">
+            <thead className="bg-[var(--paper-soft)] text-[var(--ink-soft)]">
               <tr>
                 {Object.keys(rows[0] ?? { empty: "" }).map((key) => (
                   <th key={key} className="px-4 py-3 text-start font-bold">{key}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-dashed divide-[rgba(0,0,0,0.24)]">
               {rows.map((row, index) => (
                 <tr key={index}>
                   {Object.values(row).map((value, cell) => (
-                    <td key={cell} className="px-4 py-3 text-slate-700">{String(value)}</td>
+                    <td key={cell} className="px-4 py-3 text-[var(--ink-soft)]">{String(value)}</td>
                   ))}
                 </tr>
               ))}

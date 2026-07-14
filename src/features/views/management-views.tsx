@@ -182,7 +182,7 @@ export function CompetitionsView() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
+      <div className="sketch-card p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-sm font-semibold text-slate-500">{t(language, "mainCategory")}</p>
@@ -216,7 +216,7 @@ export function CompetitionsView() {
                   </div>
                   <StatusBadge group="entity" value={track.status} language={language} />
                 </div>
-                <div className="mt-4 grid grid-cols-3 gap-2 rounded-md bg-slate-50 p-3 text-center">
+                <div className="sketch-note mt-4 grid grid-cols-3 gap-2 p-3 text-center">
                   <div>
                     <p className="text-[11px] font-semibold text-slate-500">{t(language, "entries")}</p>
                     <p className="text-lg font-bold text-navy-900">{entryCount}</p>
@@ -241,7 +241,7 @@ export function CompetitionsView() {
                   const committee = committees.find((item) => item.id === competition.committeeId);
 
                   return (
-                    <div key={competition.id} className="rounded-md border border-slate-200 bg-white p-3">
+                    <div key={competition.id} className="sketch-note p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="font-bold text-navy-900">{localized(language, competition.subcategoryName)}</p>
@@ -266,7 +266,7 @@ export function CompetitionsView() {
                         </div>
                       </div>
                       <Progress value={competition.progress} className="mt-3" />
-                      <div className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                      <div className="sketch-note mt-3 px-3 py-2 text-xs text-[var(--ink-soft)]">
                         <p className="font-semibold text-slate-700">{supervisor?.fullName ?? competition.supervisorId}</p>
                         <p className="mt-1 truncate">{committee ? localized(language, committee.name) : competition.committeeId}</p>
                       </div>
@@ -352,7 +352,7 @@ export function EvaluatorsView() {
       header: language === "ar" ? "المحكم" : "Evaluator",
       cell: (row) => (
         <div className="flex items-center gap-3">
-          <div className="grid h-9 w-9 place-items-center rounded-full bg-navy-900 text-xs font-bold text-white">{row.initials}</div>
+          <div className="grid h-9 w-9 place-items-center rounded-[999px_820px_920px_840px] border-2 border-[var(--line)] bg-[var(--paper-warm)] text-xs font-bold text-[var(--ink)]">{row.initials}</div>
           <div>
             <p className="font-bold text-navy-900">{row.fullName}</p>
             <p className="text-xs text-slate-500">{row.email}</p>
@@ -563,7 +563,7 @@ function EvaluatorForm({
       <FormField label={language === "ar" ? "الوزن" : "Weight"} error={form.formState.errors.weight?.message}>
         <Input type="number" {...form.register("weight", { valueAsNumber: true })} />
       </FormField>
-      <div className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">
+      <div className="sketch-note p-3 text-sm text-[var(--ink-soft)]">
         {language === "ar" ? "الوزن الافتراضي لهذا الدور:" : "Default weight for this role:"} {defaultWeights[role]}%
       </div>
       <div className="md:col-span-2">
@@ -580,7 +580,7 @@ function FormField({ label, error, children }: { label: string; error?: string; 
     <div className="space-y-2">
       <Label>{label}</Label>
       {children}
-      {error ? <p className="text-xs font-semibold text-red-600">{error}</p> : null}
+      {error ? <p className="text-xs font-semibold text-[var(--ink)]">{error}</p> : null}
     </div>
   );
 }
@@ -748,7 +748,7 @@ export function CriteriaView() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
+      <div className="sketch-card flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="text-sm font-semibold text-slate-500">{language === "ar" ? "المجموع الأقصى الحالي" : "Current maximum score"}</p>
           <p className="text-3xl font-bold text-navy-900">{total}</p>

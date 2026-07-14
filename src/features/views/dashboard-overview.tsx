@@ -39,10 +39,10 @@ export function DashboardOverview() {
   }));
 
   const funnel = [
-    { name: language === "ar" ? "مقدمة" : "Submitted", value: entries.length, fill: "#0b1e34" },
-    { name: language === "ar" ? "مؤهلة" : "Qualified", value: qualified, fill: "#1f7a53" },
-    { name: language === "ar" ? "نهائية" : "Finalists", value: finalists, fill: "#56a6d6" },
-    { name: language === "ar" ? "معتمدة" : "Approved", value: approvedWinners, fill: "#9f2446" }
+    { name: language === "ar" ? "مقدمة" : "Submitted", value: entries.length, fill: "#000000" },
+    { name: language === "ar" ? "مؤهلة" : "Qualified", value: qualified, fill: "#ffffff" },
+    { name: language === "ar" ? "نهائية" : "Finalists", value: finalists, fill: "#000000" },
+    { name: language === "ar" ? "معتمدة" : "Approved", value: approvedWinners, fill: "#ffffff" }
   ];
 
   const averageByCriterion = criteria.map((criterion) => {
@@ -77,13 +77,13 @@ export function DashboardOverview() {
           <CardContent className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={entriesByTrack}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <CartesianGrid strokeDasharray="6 5" stroke="rgba(0,0,0,0.24)" vertical={false} />
                 <XAxis dataKey="name" />
                 <YAxis allowDecimals={false} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="entries" name={t(language, "entries")} fill="#173d69" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="qualified" name={t(language, "qualifiedEntries")} fill="#1f7a53" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="entries" name={t(language, "entries")} fill="#000000" radius={[5, 7, 1, 2]} />
+                <Bar dataKey="qualified" name={t(language, "qualifiedEntries")} fill="#ffffff" stroke="#000000" strokeWidth={2} radius={[7, 5, 2, 1]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -99,7 +99,7 @@ export function DashboardOverview() {
                 <Tooltip />
                 <Funnel dataKey="value" data={funnel} isAnimationActive>
                   {funnel.map((entry) => (
-                    <Cell key={entry.name} fill={entry.fill} />
+                    <Cell key={entry.name} fill={entry.fill} stroke="#000000" strokeWidth={2} />
                   ))}
                 </Funnel>
               </FunnelChart>
@@ -116,11 +116,11 @@ export function DashboardOverview() {
           <CardContent className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={averageByCriterion}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <CartesianGrid strokeDasharray="6 5" stroke="rgba(0,0,0,0.24)" vertical={false} />
                 <XAxis dataKey="name" />
                 <YAxis domain={[0, 10]} />
                 <Tooltip />
-                <Line type="monotone" dataKey="average" stroke="#9f2446" strokeWidth={3} />
+                <Line type="monotone" dataKey="average" stroke="#000000" strokeWidth={3} dot={{ fill: "#ffffff", stroke: "#000000", strokeWidth: 2 }} />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -149,12 +149,12 @@ export function DashboardOverview() {
           </CardHeader>
           <CardContent className="space-y-3">
             {timeline.slice(-3).map((item) => (
-              <div key={item.id} className="flex items-center justify-between gap-3 rounded-md bg-slate-50 p-3">
+              <div key={item.id} className="sketch-note flex items-center justify-between gap-3 p-3">
                 <div>
                   <p className="font-semibold text-navy-900">{localized(language, item.title)}</p>
                   <p className="text-xs text-slate-500">{item.owner}</p>
                 </div>
-                <BadgeCheck className="h-5 w-5 text-gulf-green" />
+                <BadgeCheck className="h-5 w-5 text-[var(--ink)]" />
               </div>
             ))}
           </CardContent>
@@ -168,7 +168,7 @@ export function DashboardOverview() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4">
-              <div className="grid h-16 w-16 place-items-center rounded-md bg-emerald-50 text-2xl font-bold text-emerald-700">
+              <div className="grid h-16 w-16 place-items-center rounded-[13px_9px_16px_11px] border-2 border-[var(--line)] bg-[var(--paper-warm)] text-2xl font-bold text-[var(--ink)]">
                 {committeeCompletion}%
               </div>
               <div className="flex-1">
@@ -177,7 +177,7 @@ export function DashboardOverview() {
                   {completedEvaluations} / {expectedEvaluations} {t(language, "completedEvaluations")}
                 </p>
               </div>
-              <Users className="h-6 w-6 text-slate-400" />
+              <Users className="h-6 w-6 text-[var(--graphite)]" />
             </div>
           </CardContent>
         </Card>
@@ -192,7 +192,7 @@ export function DashboardOverview() {
         </Card>
       </div>
 
-      <div className="rounded-lg border border-burgundy-100 bg-burgundy-50 p-4 text-sm font-semibold text-burgundy-700">
+      <div className="sketch-note bg-[var(--paper-soft)] p-4 text-sm font-bold text-[var(--ink)]">
         <Award className="me-2 inline h-4 w-4" />
         {language === "ar"
           ? "البيانات مستندة إلى قواعد PDF ومهيأة كعرض أمامي فقط مع حفظ محلي."

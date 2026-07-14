@@ -24,22 +24,22 @@ export function WeightedScoreBreakdown({
       {rows.map((row) => {
         const evaluator = evaluators.find((item) => item.id === row.evaluatorId);
         return (
-          <div key={row.evaluatorId} className="rounded-lg border border-slate-200 p-4">
+          <div key={row.evaluatorId} className="sketch-note p-4">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="font-bold text-navy-900">{evaluator?.fullName ?? row.evaluatorId}</p>
+                <p className="font-bold text-[var(--ink)]">{evaluator?.fullName ?? row.evaluatorId}</p>
                 <p className="text-xs text-slate-500">
                   {language === "ar" ? "الدرجة الخام" : "Raw score"} {row.rawScore}/{row.maximumPossibleScore} ·{" "}
                   {language === "ar" ? "الوزن" : "Weight"} {row.weight}%
                 </p>
               </div>
-              <p className="text-lg font-bold text-gulf-green">{(row.weightedContribution * row.maximumPossibleScore).toFixed(2)}</p>
+              <p className="text-lg font-bold text-[var(--ink)]">{(row.weightedContribution * row.maximumPossibleScore).toFixed(2)}</p>
             </div>
             <Progress value={row.percentage * 100} className="mt-3" />
           </div>
         );
       })}
-      <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+      <p className="sketch-note p-3 text-sm text-[var(--ink-soft)]">
         {language === "ar"
           ? "الصيغة: الدرجة الموزونة = (درجة المحكم / مجموع المعايير) × وزن المحكم، ثم تجمع المساهمات وتضرب في مجموع المعايير."
           : "Formula: weighted contribution = (evaluator score / criteria maximum) × evaluator weight, then contributions are summed and multiplied by the criteria maximum."}

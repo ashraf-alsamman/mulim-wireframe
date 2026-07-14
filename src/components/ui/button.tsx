@@ -7,16 +7,16 @@ import type { ButtonHTMLAttributes } from "react";
 import { cn } from "@/utils/cn";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy-500 disabled:pointer-events-none disabled:opacity-45",
+  "sketch-button inline-flex items-center justify-center gap-2 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink)] disabled:pointer-events-none disabled:opacity-45",
   {
     variants: {
       variant: {
-        default: "bg-navy-900 text-white hover:bg-navy-700",
-        secondary: "bg-white text-navy-900 ring-1 ring-slate-200 hover:bg-slate-50",
-        ghost: "text-slate-700 hover:bg-slate-100",
-        danger: "bg-gulf-red text-white hover:bg-red-700",
-        success: "bg-gulf-green text-white hover:bg-emerald-700",
-        burgundy: "bg-burgundy-700 text-white hover:bg-burgundy-500"
+        default: "bg-[var(--ink)] text-[var(--paper-soft)] hover:bg-[var(--ink-soft)]",
+        secondary: "bg-[var(--paper-soft)] text-[var(--ink)] hover:bg-[var(--paper-warm)]",
+        ghost: "border-transparent bg-transparent text-[var(--ink)] shadow-none hover:border-[var(--line)] hover:bg-[var(--paper-warm)]",
+        danger: "bg-[var(--ink)] text-[var(--paper-soft)] hover:bg-[var(--ink)]",
+        success: "bg-[var(--ink)] text-[var(--paper-soft)] hover:bg-[var(--ink)]",
+        burgundy: "bg-[var(--ink)] text-[var(--paper-soft)] hover:bg-[var(--ink)]"
       },
       size: {
         sm: "h-8 px-3",

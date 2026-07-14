@@ -11,6 +11,56 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(workspace)/layout.js"
     ],
+    "/(workspace)/entries/[id]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(workspace)/entries/[id]/page.js"
+    ],
+    "/(workspace)/entries/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(workspace)/entries/page.js"
+    ],
+    "/(workspace)/filtering/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(workspace)/filtering/page.js"
+    ],
+    "/(workspace)/initial-evaluation/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(workspace)/initial-evaluation/page.js"
+    ],
+    "/(workspace)/final-evaluation/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(workspace)/final-evaluation/page.js"
+    ],
+    "/(workspace)/tie-breaking/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(workspace)/tie-breaking/page.js"
+    ],
+    "/(workspace)/approvals/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(workspace)/approvals/page.js"
+    ],
+    "/(workspace)/winners/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(workspace)/winners/page.js"
+    ],
+    "/(workspace)/timeline/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(workspace)/timeline/page.js"
+    ],
+    "/(workspace)/dashboard/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(workspace)/dashboard/page.js"
+    ],
     "/(workspace)/competitions/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -30,16 +80,6 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(workspace)/criteria/page.js"
-    ],
-    "/(workspace)/entries/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(workspace)/entries/page.js"
-    ],
-    "/(workspace)/entries/[id]/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(workspace)/entries/[id]/page.js"
     ]
   }
 }

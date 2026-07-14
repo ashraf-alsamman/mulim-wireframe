@@ -18,9 +18,9 @@ export function ScoreInput({
   onChange: (id: CriterionId, value: number) => void;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
+    <div className="sketch-note p-4">
       <div className="flex items-center justify-between gap-4">
-        <label htmlFor={id} className="font-semibold text-slate-700">
+        <label htmlFor={id} className="font-bold text-[var(--ink-soft)]">
           {label}
         </label>
         <input
@@ -32,7 +32,7 @@ export function ScoreInput({
           value={value}
           disabled={disabled}
           onChange={(event) => onChange(id, Number(event.target.value))}
-          className="h-9 w-20 rounded-md border border-slate-200 px-2 text-center text-sm font-bold"
+          className="sketch-input h-9 w-20 px-2 text-center text-sm font-bold"
         />
       </div>
       <input

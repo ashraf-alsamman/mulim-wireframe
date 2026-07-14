@@ -394,7 +394,7 @@ export function TieBreakingView() {
             <CardContent className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2">
                 {tiedEntries.map((entry) => (
-                  <div key={entry.id} className="rounded-lg border border-slate-200 p-4">
+                  <div key={entry.id} className="sketch-note p-4">
                     <p className="font-bold text-navy-900">{entry.title}</p>
                     <p className="text-sm text-slate-500">{entry.participantName} · #{entry.rank ?? "-"}</p>
                     <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
@@ -413,7 +413,7 @@ export function TieBreakingView() {
                   </div>
                 ))}
               </div>
-              <div className="rounded-lg bg-slate-50 p-4">
+              <div className="sketch-note p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="font-semibold text-slate-700">
                     {language === "ar" ? "تقدم التصويت" : "Voting progress"} · {tieCase.votes.length}/{evaluators.length}
@@ -493,7 +493,7 @@ export function ApprovalsView() {
   return (
     <div className="space-y-5">
       {settings.locked ? (
-        <div className="rounded-lg border border-burgundy-100 bg-burgundy-50 p-4 text-sm font-semibold text-burgundy-700">{t(language, "lockedWarning")}</div>
+        <div className="sketch-note bg-[var(--paper-soft)] p-4 text-sm font-bold text-[var(--ink)]">{t(language, "lockedWarning")}</div>
       ) : null}
       <Card>
         <CardHeader>
@@ -541,7 +541,7 @@ export function ApprovalsView() {
         </CardHeader>
         <CardContent className="space-y-2">
           {approvalHistory.map((item) => (
-            <div key={item.id} className="rounded-md bg-slate-50 p-3 text-sm">
+            <div key={item.id} className="sketch-note p-3 text-sm">
               <strong>{item.user}</strong> · {item.action} · {new Date(item.date).toLocaleString(language === "ar" ? "ar" : "en")}
               <p className="mt-1 text-slate-500">{item.comments}</p>
             </div>

@@ -23,7 +23,7 @@ export function LanguageSwitcher() {
   const setLanguage = useDemoStore((state) => state.setLanguage);
   return (
     <label className="flex items-center gap-2">
-      <Languages className="h-4 w-4 text-slate-500" />
+      <Languages className="h-4 w-4 text-[var(--graphite)]" />
       <Select value={language} onChange={(event) => setLanguage(event.target.value as Language)} className="w-28">
         <option value="ar">العربية</option>
         <option value="en">English</option>
@@ -38,7 +38,7 @@ export function RoleSwitcher() {
   const setRole = useDemoStore((state) => state.setRole);
   return (
     <label className="flex items-center gap-2">
-      <UserRound className="h-4 w-4 text-slate-500" />
+      <UserRound className="h-4 w-4 text-[var(--graphite)]" />
       <span className="sr-only">{t(language, "role")}</span>
       <Select value={role} onChange={(event) => setRole(event.target.value as RoleId)} className="w-56">
         {roles.map((item) => (
