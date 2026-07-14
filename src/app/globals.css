@@ -117,9 +117,42 @@ svg {
   transform: rotate(-0.15deg);
 }
 
+.sketch-button[data-variant="default"],
+.sketch-button[data-variant="danger"],
+.sketch-button[data-variant="success"],
+.sketch-button[data-variant="burgundy"] {
+  background: var(--ink);
+  color: var(--paper-soft);
+}
+
+.sketch-button[data-variant="secondary"],
+.sketch-button[data-variant="ghost"] {
+  background: var(--paper-soft);
+  color: var(--ink);
+}
+
+.sketch-button[data-variant="ghost"] {
+  border-color: transparent;
+  box-shadow: none;
+}
+
 .sketch-button:hover {
   transform: translate(-1px, -1px) rotate(0.1deg);
   box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.22);
+}
+
+.sketch-button[data-variant="default"]:hover,
+.sketch-button[data-variant="danger"]:hover,
+.sketch-button[data-variant="success"]:hover,
+.sketch-button[data-variant="burgundy"]:hover {
+  background: var(--ink);
+  color: var(--paper-soft);
+}
+
+.sketch-button[data-variant="secondary"]:hover,
+.sketch-button[data-variant="ghost"]:hover {
+  background: var(--paper-soft);
+  color: var(--ink);
 }
 
 .sketch-button:active {

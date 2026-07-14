@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, BadgeCheck, Calculator, Check, RotateCcw, Save, Send, ThumbsUp } from "lucide-react";
+import { ArrowLeft, ArrowRight, BadgeCheck, Calculator, Check, RotateCcw, Save, Search, Send, ThumbsUp } from "lucide-react";
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { ScoreInput } from "@/components/score-input";
 import { SearchFilterToolbar } from "@/components/search-filter-toolbar";
@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Dialog } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Select, Textarea } from "@/components/ui/forms";
+import { Input, Label, Select, Textarea } from "@/components/ui/forms";
 import { Progress } from "@/components/ui/progress";
 import { WeightedScoreBreakdown } from "@/components/weighted-score-breakdown";
 import { localized, t } from "@/i18n/translations";
@@ -27,6 +27,11 @@ const emptyScores: CriterionScores = {
   creativity: 0,
   awarenessImpact: 0
 };
+const initialPassRate = 0.6;
+
+function initialPassThreshold(maxScore: number) {
+  return Math.round(maxScore * initialPassRate * 100) / 100;
+}
 
 export function FilteringView() {
   const language = useDemoStore((state) => state.language);
@@ -166,18 +171,36 @@ export function InitialEvaluationView() {
   const settings = useDemoStore((state) => state.settings);
   const saveEvaluation = useDemoStore((state) => state.saveEvaluation);
   const criteria = useMemo(() => activeCriteria(criteriaSource), [criteriaSource]);
-  const eligibleEntries = entries.filter((entry) => entry.filteringDecision === "qualified");
-  const [index, setIndex] = useState(0);
-  const entry = eligibleEntries[index];
+  const eligibleEntries = useMemo(() => entries.filter((entry) => entry.filteringDecision === "qualified"), [entries]);
+  const maxScore = maximumPossibleScore(criteria);
+  const passThreshold = initialPassThreshold(maxScore);
+  const [entryId, setEntryId] = useState(eligibleEntries[0]?.id ?? "");
+  const [evaluationOpen, setEvaluationOpen] = useState(false);
+  const entry = eligibleEntries.find((item) => item.id === entryId) ?? eligibleEntries[0];
+  const entryIndex = entry ? eligibleEntries.findIndex((item) => item.id === entry.id) : -1;
   const committee = entry ? committees.find((item) => item.trackId === entry.trackId) : undefined;
   const specialist = committee?.members.find((member) => member.role === "specialist");
   const evaluator = specialist ? evaluators.find((item) => item.id === specialist.evaluatorId) : undefined;
   const existing = entry && specialist ? evaluations.find((item) => item.entryId === entry.id && item.evaluatorId === specialist.evaluatorId && item.stage === "initial") : undefined;
   const [scores, setScores] = useState<CriterionScores>(existing?.scores ?? emptyScores);
   const [comments, setComments] = useState(existing?.comments ?? "");
-  const maxScore = maximumPossibleScore(criteria);
   const total = criteria.reduce((sum, criterion) => sum + scores[criterion.id], 0);
   const editable = can(role, "submitInitialEvaluation") && !settings.locked;
+
+  useEffect(() => {
+    const currentEntryExists = eligibleEntries.some((item) => item.id === entryId);
+    if (eligibleEntries.length > 0 && !currentEntryExists) {
+      setEntryId(eligibleEntries[0].id);
+    }
+    if (eligibleEntries.length === 0 && entryId) {
+      setEntryId("");
+    }
+  }, [eligibleEntries, entryId]);
+
+  useEffect(() => {
+    setScores(existing?.scores ?? emptyScores);
+    setComments(existing?.comments ?? "");
+  }, [entry?.id, evaluator?.id, existing?.scores, existing?.comments]);
 
   function changeScore(id: CriterionId, value: number) {
     const criterion = criteria.find((item) => item.id === id);
@@ -210,33 +233,60 @@ export function InitialEvaluationView() {
   }
 
   return (
-    <EvaluationPanel
-      language={language}
-      title={t(language, "initialEvaluation")}
-      entry={entry}
-      evaluatorName={evaluator?.fullName ?? "-"}
-      total={total}
-      maxScore={maxScore}
-      threshold={settings.initialQualificationThreshold}
-      scores={scores}
-      comments={comments}
-      criteria={criteria}
-      editable={editable}
-      onScore={changeScore}
-      onComments={setComments}
-      onDraft={() => persist(false)}
-      onSubmit={() => persist(true)}
-      onPrevious={() => {
-        setIndex((current) => Math.max(0, current - 1));
-        setScores(emptyScores);
-      }}
-      onNext={() => {
-        setIndex((current) => Math.min(eligibleEntries.length - 1, current + 1));
-        setScores(emptyScores);
-      }}
-      previousDisabled={index === 0}
-      nextDisabled={index >= eligibleEntries.length - 1}
-    />
+    <div className="space-y-5">
+      <Card>
+        <CardHeader>
+          <CardTitle>{language === "ar" ? "اختيار عمل للتقييم" : "Choose an entry to evaluate"}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <EntrySelectionList
+            language={language}
+            label={language === "ar" ? "الأعمال المؤهلة بعد الفرز" : "Entries qualified after filtering"}
+            entries={eligibleEntries}
+            selectedEntryId={entry.id}
+            onSelect={(selectedEntryId) => {
+              setEntryId(selectedEntryId);
+              setEvaluationOpen(true);
+            }}
+            maxScore={maxScore}
+          />
+        </CardContent>
+      </Card>
+
+      <Dialog open={evaluationOpen} onOpenChange={setEvaluationOpen} title={t(language, "initialEvaluation")} className="w-[min(96vw,1180px)]">
+        <EvaluationPanel
+          language={language}
+          title={language === "ar" ? "تقييم العمل المختار" : "Evaluate selected entry"}
+          entry={entry}
+          evaluatorName={evaluator?.fullName ?? "-"}
+          total={total}
+          maxScore={maxScore}
+          threshold={passThreshold}
+          scores={scores}
+          comments={comments}
+          criteria={criteria}
+          editable={editable}
+          onScore={changeScore}
+          onComments={setComments}
+          onDraft={() => persist(false)}
+          onSubmit={() => persist(true)}
+          onPrevious={() => {
+            const previousEntry = eligibleEntries[entryIndex - 1];
+            if (previousEntry) {
+              setEntryId(previousEntry.id);
+            }
+          }}
+          onNext={() => {
+            const nextEntry = eligibleEntries[entryIndex + 1];
+            if (nextEntry) {
+              setEntryId(nextEntry.id);
+            }
+          }}
+          previousDisabled={entryIndex <= 0}
+          nextDisabled={entryIndex >= eligibleEntries.length - 1}
+        />
+      </Dialog>
+    </div>
   );
 }
 
@@ -251,7 +301,12 @@ export function FinalEvaluationView() {
   const settings = useDemoStore((state) => state.settings);
   const saveEvaluation = useDemoStore((state) => state.saveEvaluation);
   const criteria = useMemo(() => activeCriteria(criteriaSource), [criteriaSource]);
-  const eligibleEntries = entries.filter((entry) => entry.filteringDecision === "qualified" && entry.totalScore >= settings.initialQualificationThreshold);
+  const maxScore = maximumPossibleScore(criteria);
+  const passThreshold = initialPassThreshold(maxScore);
+  const eligibleEntries = useMemo(
+    () => entries.filter((entry) => entry.filteringDecision === "qualified" && entry.totalScore >= passThreshold),
+    [entries, passThreshold]
+  );
   const [entryId, setEntryId] = useState(eligibleEntries[0]?.id ?? "");
   const entry = eligibleEntries.find((item) => item.id === entryId) ?? eligibleEntries[0];
   const committee = entry ? committees.find((item) => item.trackId === entry.trackId) : undefined;
@@ -262,8 +317,29 @@ export function FinalEvaluationView() {
   const [comments, setComments] = useState(existing?.comments ?? "");
   const [calculationOpen, setCalculationOpen] = useState(false);
   const editable = can(role, "submitFinalEvaluation") && !settings.locked;
-  const maxScore = maximumPossibleScore(criteria);
   const total = criteria.reduce((sum, criterion) => sum + scores[criterion.id], 0);
+
+  useEffect(() => {
+    const currentEntryExists = eligibleEntries.some((item) => item.id === entryId);
+    if (eligibleEntries.length > 0 && !currentEntryExists) {
+      setEntryId(eligibleEntries[0].id);
+    }
+    if (eligibleEntries.length === 0 && entryId) {
+      setEntryId("");
+    }
+  }, [eligibleEntries, entryId]);
+
+  useEffect(() => {
+    const currentEvaluatorExists = committee?.members.some((member) => member.evaluatorId === evaluatorId);
+    if (committee?.members.length && !currentEvaluatorExists) {
+      setEvaluatorId(committee.members[0].evaluatorId);
+    }
+  }, [committee, evaluatorId]);
+
+  useEffect(() => {
+    setScores(existing?.scores ?? emptyScores);
+    setComments(existing?.comments ?? "");
+  }, [entry?.id, activeEvaluatorId, existing?.scores, existing?.comments]);
 
   function changeScore(id: CriterionId, value: number) {
     const criterion = criteria.find((item) => item.id === id);
@@ -295,36 +371,40 @@ export function FinalEvaluationView() {
   return (
     <div className="space-y-5">
       <Card>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <Select
-            value={entry.id}
-            onChange={(event) => {
-              setEntryId(event.target.value);
-              setScores(emptyScores);
-            }}
-          >
-            {eligibleEntries.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.id} · {item.title}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={activeEvaluatorId}
-            onChange={(event) => {
-              setEvaluatorId(event.target.value);
-              setScores(emptyScores);
-            }}
-          >
-            {committee.members.map((member) => {
-              const evaluator = evaluators.find((item) => item.id === member.evaluatorId);
-              return (
-                <option key={member.evaluatorId} value={member.evaluatorId}>
-                  {evaluator?.fullName ?? member.evaluatorId} · {member.weight}%
-                </option>
-              );
-            })}
-          </Select>
+        <CardHeader>
+          <CardTitle>{language === "ar" ? "اختيار عمل متأهل ومقيم" : "Choose a passed entry and evaluator"}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <EntrySelectionList
+            language={language}
+            label={language === "ar" ? "الأعمال التي عدت التقييم الأولي" : "Entries that passed initial evaluation"}
+            entries={eligibleEntries}
+            selectedEntryId={entry.id}
+            onSelect={setEntryId}
+            maxScore={maxScore}
+            showInitialScore
+          />
+          <div className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
+            <div className="space-y-2">
+              <Label htmlFor="final-evaluator-select">{language === "ar" ? "المقيم" : "Evaluator"}</Label>
+              <Select id="final-evaluator-select" value={activeEvaluatorId} onChange={(event) => setEvaluatorId(event.target.value)}>
+                {committee.members.map((member) => {
+                  const evaluator = evaluators.find((item) => item.id === member.evaluatorId);
+                  return (
+                    <option key={member.evaluatorId} value={member.evaluatorId}>
+                      {evaluator?.fullName ?? member.evaluatorId} · {member.weight}%
+                    </option>
+                  );
+                })}
+              </Select>
+            </div>
+            <div className="sketch-note p-3 text-sm">
+              <p className="font-bold text-[var(--ink)]">{language === "ar" ? "شرط الظهور في القائمة" : "List rule"}</p>
+              <p className="mt-1 text-[var(--ink-soft)]">
+                {Math.round(initialPassRate * 100)}% = {passThreshold} / {maxScore}
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -361,6 +441,139 @@ export function FinalEvaluationView() {
           language={language}
         />
       </Dialog>
+    </div>
+  );
+}
+
+function EntrySelectionList({
+  language,
+  label,
+  entries,
+  selectedEntryId,
+  onSelect,
+  maxScore,
+  showInitialScore = false
+}: {
+  language: "ar" | "en";
+  label: string;
+  entries: Entry[];
+  selectedEntryId: string;
+  onSelect: (entryId: string) => void;
+  maxScore: number;
+  showInitialScore?: boolean;
+}) {
+  const pageSize = 12;
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredEntries = useMemo(() => {
+    if (!normalizedQuery) {
+      return entries;
+    }
+
+    return entries.filter((entry) => {
+      const searchable = `${entry.id} ${entry.title} ${entry.participantName} ${entry.trackId}`.toLowerCase();
+      return searchable.includes(normalizedQuery);
+    });
+  }, [entries, normalizedQuery]);
+  const pageCount = Math.max(1, Math.ceil(filteredEntries.length / pageSize));
+  const start = (page - 1) * pageSize;
+  const visibleEntries = filteredEntries.slice(start, start + pageSize);
+  const firstVisible = filteredEntries.length === 0 ? 0 : start + 1;
+  const lastVisible = Math.min(start + pageSize, filteredEntries.length);
+
+  useEffect(() => {
+    setPage(1);
+  }, [normalizedQuery, entries]);
+
+  useEffect(() => {
+    if (page > pageCount) {
+      setPage(pageCount);
+    }
+  }, [page, pageCount]);
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+        <div className="space-y-2">
+          <Label htmlFor="entry-list-search">{label}</Label>
+          <div className="relative">
+            <Search className={`pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 ${language === "ar" ? "right-3" : "left-3"}`} />
+            <Input
+              id="entry-list-search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={language === "ar" ? "ابحث بالكود أو العنوان أو اسم المشارك" : "Search by code, title, or participant"}
+              className={language === "ar" ? "pr-10" : "pl-10"}
+            />
+          </div>
+        </div>
+        <div className="sketch-note p-3 text-sm">
+          <p className="font-bold text-[var(--ink)]">{language === "ar" ? "نتائج القائمة" : "List results"}</p>
+          <p className="mt-1 text-[var(--ink-soft)]">
+            {language === "ar"
+              ? `${firstVisible}-${lastVisible} من ${filteredEntries.length}`
+              : `${firstVisible}-${lastVisible} of ${filteredEntries.length}`}
+          </p>
+        </div>
+      </div>
+
+      <div className="max-h-[34rem] space-y-2 overflow-y-auto pr-1">
+        {visibleEntries.length > 0 ? (
+          visibleEntries.map((entry) => {
+            const selected = entry.id === selectedEntryId;
+            return (
+              <button
+                key={entry.id}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => onSelect(entry.id)}
+                className={`sketch-note block w-full p-3 text-start transition ${
+                  selected ? "outline outline-2 outline-offset-2 outline-black" : "hover:-translate-y-0.5"
+                }`}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-base font-bold text-navy-900">{entry.title}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {entry.id} · {entry.participantName} · {entry.trackId}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap justify-end gap-2 text-xs">
+                    {showInitialScore ? <span className="sketch-badge px-2 py-1">{entry.totalScore.toFixed(1)} / {maxScore}</span> : null}
+                    {selected ? (
+                      <span className="sketch-badge inline-flex items-center gap-1 px-2 py-1">
+                        <Check className="h-3.5 w-3.5" />
+                        {language === "ar" ? "مختار" : "Selected"}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </button>
+            );
+          })
+        ) : (
+          <div className="sketch-note p-4 text-sm text-[var(--ink-soft)]">
+            {language === "ar" ? "لا توجد نتائج مطابقة للبحث." : "No matching entries."}
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="text-sm font-semibold text-[var(--ink-soft)]">
+          {language === "ar" ? `صفحة ${page} من ${pageCount}` : `Page ${page} of ${pageCount}`}
+        </span>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>
+            {language === "ar" ? <ArrowRight className="h-4 w-4" /> : <ArrowLeft className="h-4 w-4" />}
+            {language === "ar" ? "السابق" : "Previous"}
+          </Button>
+          <Button variant="secondary" disabled={page >= pageCount} onClick={() => setPage((current) => Math.min(pageCount, current + 1))}>
+            {language === "ar" ? "التالي" : "Next"}
+            {language === "ar" ? <ArrowLeft className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -595,6 +808,8 @@ function EvaluationPanel({
   nextDisabled?: boolean;
   extraAction?: ReactNode;
 }) {
+  const thresholdPercent = threshold === undefined || maxScore === 0 ? null : Math.round((threshold / maxScore) * 100);
+
   return (
     <div className="grid gap-5 xl:grid-cols-[0.7fr_1.3fr]">
       <Card>
@@ -608,9 +823,9 @@ function EvaluationPanel({
           <div className="rounded-lg bg-navy-50 p-4">
             <p className="text-sm font-semibold text-navy-700">{language === "ar" ? "المجموع" : "Total"}</p>
             <p className="text-4xl font-bold text-navy-900">{total.toFixed(1)} / {maxScore}</p>
-            {threshold ? (
+            {threshold !== undefined ? (
               <p className="mt-1 text-sm text-slate-600">
-                {language === "ar" ? "حد التأهل" : "Qualification threshold"} {threshold}
+                {language === "ar" ? "حد التأهل" : "Qualification threshold"} {thresholdPercent}% ({threshold} / {maxScore})
               </p>
             ) : null}
           </div>
