@@ -520,6 +520,27 @@ export const useDemoStore = create<DemoStore>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
+          const seedSnapshot = createSeedState();
+          const currentTieIds = new Set(state.tieCases.map((tieCase) => tieCase.id));
+          const missingTieCases = seedSnapshot.tieCases.filter((tieCase) => !currentTieIds.has(tieCase.id));
+          if (missingTieCases.length > 0) {
+            const tieEntryIds = new Set(seedSnapshot.tieCases.flatMap((tieCase) => tieCase.entryIds));
+            const seedEntriesById = new Map(seedSnapshot.entries.map((entry) => [entry.id, entry]));
+            state.tieCases = [...state.tieCases, ...missingTieCases];
+            state.entries = state.entries.map((entry) => {
+              const seedEntry = seedEntriesById.get(entry.id);
+              return seedEntry && tieEntryIds.has(entry.id)
+                ? {
+                    ...entry,
+                    finalScore: seedEntry.finalScore,
+                    awarenessScore: seedEntry.awarenessScore,
+                    finalistStatus: seedEntry.finalistStatus,
+                    currentStage: seedEntry.currentStage,
+                    rank: seedEntry.rank
+                  }
+                : entry;
+            });
+          }
           state.hydrated = true;
         }
       }

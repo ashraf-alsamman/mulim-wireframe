@@ -169,18 +169,6 @@ export function createSeedState(): DemoStateSnapshot {
     } satisfies Entry;
   });
 
-  enrichedEntries.sort((a, b) => b.finalScore - a.finalScore).forEach((entry, index) => {
-    entry.rank = entry.finalScore > 0 ? index + 1 : undefined;
-  });
-
-  const tied = enrichedEntries.filter((entry) => ["ENT-VID-001", "ENT-VID-002"].includes(entry.id));
-  for (const entry of tied) {
-    entry.finalScore = 27.6;
-    entry.awarenessScore = 9.2;
-    entry.finalistStatus = "awaitingTieBreak";
-    entry.currentStage = "tieBreaking";
-  }
-
   const tieCases: TieCase[] = [
     {
       id: "TIE-001",
@@ -191,8 +179,114 @@ export function createSeedState(): DemoStateSnapshot {
         { evaluatorId: "EVAL-VID-SPEC", entryId: "ENT-VID-001", date: "2026-03-15T10:00:00.000Z" },
         { evaluatorId: "EVAL-VID-PREV", entryId: "ENT-VID-002", date: "2026-03-15T10:03:00.000Z" }
       ]
+    },
+    {
+      id: "TIE-002",
+      entryIds: ["ENT-VID-003", "ENT-VID-004", "ENT-VID-005"],
+      reason: "Equal final score across three video entries",
+      status: "voting",
+      votes: [
+        { evaluatorId: "EVAL-VID-SPEC", entryId: "ENT-VID-003", date: "2026-03-15T10:12:00.000Z" }
+      ]
+    },
+    {
+      id: "TIE-003",
+      entryIds: ["ENT-DRA-003", "ENT-DRA-004"],
+      reason: "Equal final score and awareness-impact score",
+      status: "voting",
+      votes: [
+        { evaluatorId: "EVAL-DRW-SPEC", entryId: "ENT-DRA-003", date: "2026-03-15T10:18:00.000Z" },
+        { evaluatorId: "EVAL-DRW-PREV", entryId: "ENT-DRA-004", date: "2026-03-15T10:21:00.000Z" }
+      ]
+    },
+    {
+      id: "TIE-004",
+      entryIds: ["ENT-DRA-006", "ENT-DRA-007", "ENT-DRA-008"],
+      reason: "Equal final score across three drawing entries",
+      status: "voting",
+      votes: [
+        { evaluatorId: "EVAL-DRW-SPEC", entryId: "ENT-DRA-006", date: "2026-03-15T10:24:00.000Z" },
+        { evaluatorId: "EVAL-DRW-SEC1", entryId: "ENT-DRA-007", date: "2026-03-15T10:28:00.000Z" }
+      ]
+    },
+    {
+      id: "TIE-005",
+      entryIds: ["ENT-PHO-002", "ENT-PHO-003"],
+      reason: "Equal final score and equal awareness-impact score",
+      status: "voting",
+      votes: [
+        { evaluatorId: "EVAL-PHO-SPEC", entryId: "ENT-PHO-002", date: "2026-03-15T10:31:00.000Z" }
+      ]
+    },
+    {
+      id: "TIE-006",
+      entryIds: ["ENT-PHO-006", "ENT-PHO-007", "ENT-PHO-008"],
+      reason: "Equal final score across three photography entries",
+      status: "voting",
+      votes: [
+        { evaluatorId: "EVAL-PHO-PREV", entryId: "ENT-PHO-006", date: "2026-03-15T10:35:00.000Z" },
+        { evaluatorId: "EVAL-PHO-SEC1", entryId: "ENT-PHO-007", date: "2026-03-15T10:37:00.000Z" }
+      ]
+    },
+    {
+      id: "TIE-007",
+      entryIds: ["ENT-WRI-002", "ENT-WRI-003"],
+      reason: "Equal final score and awareness-impact score",
+      status: "voting",
+      votes: [
+        { evaluatorId: "EVAL-WRI-SPEC", entryId: "ENT-WRI-002", date: "2026-03-15T10:41:00.000Z" }
+      ]
+    },
+    {
+      id: "TIE-008",
+      entryIds: ["ENT-WRI-005", "ENT-WRI-006", "ENT-WRI-007"],
+      reason: "Equal final score across three writing entries",
+      status: "voting",
+      votes: [
+        { evaluatorId: "EVAL-WRI-SPEC", entryId: "ENT-WRI-005", date: "2026-03-15T10:43:00.000Z" },
+        { evaluatorId: "EVAL-WRI-SEC2", entryId: "ENT-WRI-006", date: "2026-03-15T10:45:00.000Z" }
+      ]
+    },
+    {
+      id: "TIE-009",
+      entryIds: ["ENT-VID-006", "ENT-VID-007"],
+      reason: "Equal final score and awareness-impact score",
+      status: "voting",
+      votes: []
+    },
+    {
+      id: "TIE-010",
+      entryIds: ["ENT-DRA-014", "ENT-DRA-015", "ENT-DRA-016"],
+      reason: "Equal final score across three drawing entries",
+      status: "voting",
+      votes: [
+        { evaluatorId: "EVAL-DRW-PREV", entryId: "ENT-DRA-014", date: "2026-03-15T10:48:00.000Z" }
+      ]
     }
   ];
+
+  const tieScores = new Map<string, { finalScore: number; awarenessScore: number }>();
+  tieCases.forEach((tieCase, index) => {
+    const finalScore = Math.round((28 - index * 0.35) * 100) / 100;
+    const awarenessScore = Math.round((9.2 - (index % 4) * 0.15) * 100) / 100;
+    for (const entryId of tieCase.entryIds) {
+      tieScores.set(entryId, { finalScore, awarenessScore });
+    }
+  });
+
+  for (const entry of enrichedEntries) {
+    const tiedScore = tieScores.get(entry.id);
+    if (tiedScore) {
+      entry.finalScore = tiedScore.finalScore;
+      entry.awarenessScore = tiedScore.awarenessScore;
+      entry.finalistStatus = "awaitingTieBreak";
+      entry.currentStage = "tieBreaking";
+    }
+  }
+
+  enrichedEntries.sort((a, b) => b.finalScore - a.finalScore).forEach((entry, index) => {
+    entry.rank = entry.finalScore > 0 ? index + 1 : undefined;
+  });
 
   return {
     language: "ar",

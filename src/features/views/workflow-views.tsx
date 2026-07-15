@@ -637,12 +637,7 @@ export function TieBreakingView() {
       .map((member) => evaluators.find((evaluator) => evaluator.id === member.evaluatorId))
       .filter((evaluator): evaluator is NonNullable<typeof evaluator> => Boolean(evaluator)) ?? evaluators;
   const selectedActiveVoterId = selectedTieCase ? (voterIdsByTie[selectedTieCase.id] ?? selectedTieVoters[0]?.id ?? "") : "";
-  const selectedActiveVoter = selectedTieVoters.find((evaluator) => evaluator.id === selectedActiveVoterId);
   const selectedActiveVote = selectedTieCase?.votes.find((vote) => vote.evaluatorId === selectedActiveVoterId);
-  const selectedVoteWinner = selectedTieCase ? committeeVoteWinner(selectedTieCase) : null;
-  const selectedWinnerEntry = selectedTiedEntries.find((entry) => entry.id === (selectedVoteWinner ?? selectedTieCase?.manualWinnerId));
-  const selectedProgressTotal = Math.max(1, selectedTieVoters.length);
-  const selectedProgressValue = selectedTieCase ? Math.min(100, (selectedTieCase.votes.length / selectedProgressTotal) * 100) : 0;
 
   return (
     <div className="space-y-5">
@@ -808,90 +803,38 @@ export function TieBreakingView() {
           className="w-[min(96vw,980px)]"
         >
           <div className="space-y-4">
-            <div className="sketch-note p-4">
-              <p className="text-lg font-bold text-[var(--ink)]">
-                {selectedTiedEntries.map((entry) => entry.participantName).join(" × ")}
-              </p>
-              <p className="mt-1 text-sm text-slate-500">
-                {selectedTieCase.id} · {selectedTrackId ?? "-"} · {selectedTieCase.reason}
-              </p>
-            </div>
-
-            <div className="grid gap-3 lg:grid-cols-[1fr_0.8fr]">
-              <div className="space-y-2">
-                <Label htmlFor={`selected-tie-voter-${selectedTieCase.id}`}>{language === "ar" ? "المحكم المصوّت" : "Voting evaluator"}</Label>
-                <Select
-                  id={`selected-tie-voter-${selectedTieCase.id}`}
-                  value={selectedActiveVoterId}
-                  disabled={!canVote || selectedTieCase.status !== "voting"}
-                  onChange={(event) => setVoterIdsByTie((current) => ({ ...current, [selectedTieCase.id]: event.target.value }))}
-                >
-                  {selectedTieVoters.map((evaluator) => (
-                    <option key={evaluator.id} value={evaluator.id}>
-                      {evaluator.fullName}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div className="sketch-note p-3 text-sm">
-                <p className="font-bold text-[var(--ink)]">{language === "ar" ? "تقدم التصويت" : "Voting progress"}</p>
-                <p className="mt-1 text-[var(--ink-soft)]">
-                  {selectedTieCase.votes.length}/{selectedTieVoters.length}
-                </p>
-                <Progress value={selectedProgressValue} className="mt-2" />
-              </div>
-            </div>
-
             <div className="space-y-3">
               {selectedTiedEntries.map((entry) => (
-                <div key={entry.id} className="sketch-note p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
+                <div key={entry.id} className={`sketch-note p-4 ${selectedActiveVote?.entryId === entry.id ? "outline outline-2 outline-offset-2 outline-black" : ""}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-base font-bold text-navy-900">{entry.participantName}</p>
                       <p className="mt-1 text-sm text-slate-500">{entry.title} · {entry.id}</p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge tone="neutral">{entry.finalScore.toFixed(2)}</Badge>
-                      {selectedTieCase.status !== "voting" ? (
-                        <Badge tone="info">
-                          {language === "ar" ? "الأصوات" : "Votes"} {selectedTieCase.votes.filter((vote) => vote.entryId === entry.id).length}
-                        </Badge>
-                      ) : null}
-                      {selectedActiveVote?.entryId === entry.id ? <Badge tone="success">{language === "ar" ? "اختيار المحكم الحالي" : "Current choice"}</Badge> : null}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone="info">{selectedTieCase.votes.filter((vote) => vote.entryId === entry.id).length}</Badge>
+                      <Button
+                        disabled={!canVote || !selectedActiveVoterId}
+                        onClick={() => castTieVote(selectedTieCase.id, selectedActiveVoterId, entry.id)}
+                      >
+                        <ThumbsUp className="h-4 w-4" />
+                        {selectedActiveVote?.entryId === entry.id ? (language === "ar" ? "صوتك الحالي" : "Your vote") : language === "ar" ? "صوّت لهذا الاسم" : "Vote"}
+                      </Button>
                     </div>
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Button
-                      disabled={!canVote || selectedTieCase.status !== "voting" || !selectedActiveVoterId}
-                      onClick={() => castTieVote(selectedTieCase.id, selectedActiveVoterId, entry.id)}
-                    >
-                      <ThumbsUp className="h-4 w-4" />
-                      {selectedActiveVote?.entryId === entry.id ? (language === "ar" ? "صوتك الحالي" : "Your vote") : language === "ar" ? "صوّت لهذا الاسم" : "Vote for this name"}
-                    </Button>
-                    <Button disabled={!canResolve} variant="secondary" onClick={() => manualResolveTie(selectedTieCase.id, entry.id)}>
-                      {t(language, "manualResolve")}
-                    </Button>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-slate-500">
-                {selectedTieCase.status !== "voting"
-                  ? `${language === "ar" ? "الفائز:" : "Winner:"} ${selectedWinnerEntry ? selectedWinnerEntry.participantName : "-"}`
-                  : selectedActiveVote
-                    ? `${language === "ar" ? "اختيار" : "Selected"} ${selectedActiveVoter?.fullName ?? ""}: ${
-                        selectedTiedEntries.find((entry) => entry.id === selectedActiveVote.entryId)?.participantName ?? selectedActiveVote.entryId
-                      }`
-                    : language === "ar"
-                      ? "اختر المحكم ثم صوّت لأحد الأسماء."
-                      : "Choose an evaluator, then vote for one name."}
-              </p>
-              <Button disabled={!canResolve || selectedTieCase.status !== "voting"} onClick={() => closeTieVoting(selectedTieCase.id)}>
-                {t(language, "closeVoting")}
-              </Button>
-            </div>
+            <p className="text-sm text-slate-500">
+              {selectedActiveVote
+                ? `${language === "ar" ? "تم اختيار:" : "Selected:"} ${
+                    selectedTiedEntries.find((entry) => entry.id === selectedActiveVote.entryId)?.participantName ?? selectedActiveVote.entryId
+                  }`
+                : language === "ar"
+                  ? "اضغط زر التصويت بجانب الاسم الذي تريد اختياره."
+                  : "Click the vote button next to the name you want."}
+            </p>
           </div>
         </Dialog>
       ) : null}
