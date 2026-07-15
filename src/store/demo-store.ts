@@ -518,35 +518,86 @@ export const useDemoStore = create<DemoStore>()(
         approvalHistory: state.approvalHistory,
         settings: state.settings
       }),
+      merge: mergePersistedState,
       onRehydrateStorage: () => (state) => {
         if (state) {
-          const seedSnapshot = createSeedState();
-          const currentTieIds = new Set(state.tieCases.map((tieCase) => tieCase.id));
-          const missingTieCases = seedSnapshot.tieCases.filter((tieCase) => !currentTieIds.has(tieCase.id));
-          if (missingTieCases.length > 0) {
-            const tieEntryIds = new Set(seedSnapshot.tieCases.flatMap((tieCase) => tieCase.entryIds));
-            const seedEntriesById = new Map(seedSnapshot.entries.map((entry) => [entry.id, entry]));
-            state.tieCases = [...state.tieCases, ...missingTieCases];
-            state.entries = state.entries.map((entry) => {
-              const seedEntry = seedEntriesById.get(entry.id);
-              return seedEntry && tieEntryIds.has(entry.id)
-                ? {
-                    ...entry,
-                    finalScore: seedEntry.finalScore,
-                    awarenessScore: seedEntry.awarenessScore,
-                    finalistStatus: seedEntry.finalistStatus,
-                    currentStage: seedEntry.currentStage,
-                    rank: seedEntry.rank
-                  }
-                : entry;
-            });
-          }
           state.hydrated = true;
         }
       }
     }
   )
 );
+
+function mergePersistedState(persistedState: unknown, currentState: DemoStore): DemoStore {
+  const persisted = (persistedState ?? {}) as Partial<DemoStore>;
+  const seedSnapshot = createSeedState();
+
+  return {
+    ...currentState,
+    ...persisted,
+    tracks: mergeById(seedSnapshot.tracks, persisted.tracks),
+    evaluators: mergeById(seedSnapshot.evaluators, persisted.evaluators),
+    committees: mergeById(seedSnapshot.committees, persisted.committees),
+    criteria: mergeById(seedSnapshot.criteria, persisted.criteria),
+    entries: mergeEntries(seedSnapshot.entries, persisted.entries),
+    evaluations: mergeById(seedSnapshot.evaluations, persisted.evaluations),
+    tieCases: mergeById(seedSnapshot.tieCases, persisted.tieCases),
+    timeline: mergeById(seedSnapshot.timeline, persisted.timeline),
+    notifications: mergeById(seedSnapshot.notifications, persisted.notifications),
+    activities: mergeById(seedSnapshot.activities, persisted.activities),
+    approvalHistory: mergeById(seedSnapshot.approvalHistory, persisted.approvalHistory),
+    settings: {
+      ...seedSnapshot.settings,
+      ...persisted.settings
+    },
+    hydrated: false,
+    toasts: currentState.toasts
+  };
+}
+
+function mergeById<T extends { id: string }>(seedItems: T[], persistedItems?: T[]): T[] {
+  const persistedById = new Map((persistedItems ?? []).map((item) => [item.id, item]));
+  const seedIds = new Set(seedItems.map((item) => item.id));
+
+  return [
+    ...seedItems.map((item) => ({ ...item, ...(persistedById.get(item.id) ?? {}) })),
+    ...(persistedItems ?? []).filter((item) => !seedIds.has(item.id))
+  ];
+}
+
+function mergeEntries(seedEntries: Entry[], persistedEntries?: Entry[]): Entry[] {
+  const persistedById = new Map((persistedEntries ?? []).map((entry) => [entry.id, entry]));
+  const seedIds = new Set(seedEntries.map((entry) => entry.id));
+  const mergedEntries = seedEntries.map((seedEntry) => {
+    const persistedEntry = persistedById.get(seedEntry.id);
+
+    if (!persistedEntry) {
+      return seedEntry;
+    }
+
+    const needsSeedScore = !hasVisibleScore(persistedEntry) && hasVisibleScore(seedEntry);
+
+    return {
+      ...seedEntry,
+      ...persistedEntry,
+      category: persistedEntry.category || seedEntry.category,
+      subcategory: persistedEntry.subcategory ?? seedEntry.subcategory,
+      totalScore: needsSeedScore ? seedEntry.totalScore : persistedEntry.totalScore ?? seedEntry.totalScore,
+      finalScore: needsSeedScore ? seedEntry.finalScore : persistedEntry.finalScore ?? seedEntry.finalScore,
+      awarenessScore: needsSeedScore ? seedEntry.awarenessScore : persistedEntry.awarenessScore ?? seedEntry.awarenessScore,
+      finalistStatus: needsSeedScore ? seedEntry.finalistStatus : persistedEntry.finalistStatus ?? seedEntry.finalistStatus,
+      currentStage: needsSeedScore ? seedEntry.currentStage : persistedEntry.currentStage ?? seedEntry.currentStage,
+      evaluationStatus: needsSeedScore ? seedEntry.evaluationStatus : persistedEntry.evaluationStatus ?? seedEntry.evaluationStatus,
+      rank: needsSeedScore ? seedEntry.rank : persistedEntry.rank ?? seedEntry.rank
+    };
+  });
+
+  return [...mergedEntries, ...(persistedEntries ?? []).filter((entry) => !seedIds.has(entry.id))];
+}
+
+function hasVisibleScore(entry: Entry): boolean {
+  return entry.totalScore > 0 || entry.finalScore > 0 || entry.awarenessScore > 0;
+}
 
 function recalculate(state: DemoStore): Partial<DemoStore> {
   const entries = state.entries.map((entry) => {

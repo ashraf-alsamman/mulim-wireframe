@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Download, FileJson, Printer, Sparkles, Trophy, Upload } from "lucide-react";
+import { Download, FileJson, List, Printer, Sparkles, Trophy, Upload } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
 import { TimelineStrip } from "@/components/timeline-view";
@@ -10,87 +10,119 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import { Dialog } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input, Label, Select } from "@/components/ui/forms";
 import { localized, t } from "@/i18n/translations";
 import { useDemoStore } from "@/store/demo-store";
 import type { DemoStateSnapshot, Entry, TimelineItem } from "@/types/demo";
-import { rankEntries, selectTopFinalists } from "@/utils/calculations";
+import { rankEntries } from "@/utils/calculations";
 
 export function WinnersView() {
   const language = useDemoStore((state) => state.language);
   const entries = useDemoStore((state) => state.entries);
   const tracks = useDemoStore((state) => state.tracks);
-  const settings = useDemoStore((state) => state.settings);
   const tieCases = useDemoStore((state) => state.tieCases);
   const updateWinnerStatus = useDemoStore((state) => state.updateWinnerStatus);
-  const ranked = useMemo(() => {
-    const approved = entries.filter((entry) => entry.finalistStatus === "approvedWinner");
-    return approved.length ? rankEntries(approved, tieCases) : selectTopFinalists(entries, Math.min(12, settings.finalistCount), tieCases);
-  }, [entries, settings.finalistCount, tieCases]);
+  const [selectedGroupId, setSelectedGroupId] = useState("");
+  const winnerGroups = useMemo(
+    () =>
+      tracks.map((track) => {
+        const trackEntries = entries.filter((entry) => entry.trackId === track.id && entry.finalScore > 0);
+        const schoolRankedEntries = rankEntries(trackEntries.filter((entry) => entry.subcategory === "schools"), tieCases);
+        const universityRankedEntries = rankEntries(trackEntries.filter((entry) => entry.subcategory === "universities"), tieCases);
 
-  const columns: Array<Column<Entry & { rank: number }>> = [
-    {
-      key: "rank",
-      header: t(language, "rank"),
-      cell: (row) => <span className="text-lg font-bold text-[var(--ink)]">#{row.rank}</span>
-    },
-    {
-      key: "entry",
-      header: t(language, "winners"),
-      cell: (row) => (
-        <div>
-          <p className="font-bold text-navy-900">{row.participantName}</p>
-          <p className="text-xs text-slate-500">{row.title}</p>
+        return {
+          track,
+          groups: [
+            {
+              id: `${track.id}-schools`,
+              label: t(language, "schools"),
+              rankedEntries: schoolRankedEntries,
+              winners: schoolRankedEntries.slice(0, 3)
+            },
+            {
+              id: `${track.id}-universities`,
+              label: t(language, "universities"),
+              rankedEntries: universityRankedEntries,
+              winners: universityRankedEntries.slice(0, 3)
+            }
+          ]
+        };
+      }),
+    [entries, language, tracks, tieCases]
+  );
+  const winnerCount = winnerGroups.reduce(
+    (total, trackGroup) => total + trackGroup.groups.reduce((groupTotal, group) => groupTotal + group.winners.length, 0),
+    0
+  );
+  const selectedWinnerGroup = winnerGroups
+    .flatMap((trackGroup) => trackGroup.groups.map((group) => ({ ...group, track: trackGroup.track })))
+    .find((group) => group.id === selectedGroupId);
+
+  const renderWinnerActions = (winner: Entry) => (
+    <div className="flex flex-wrap gap-2">
+      <Button size="sm" variant="secondary" onClick={() => updateWinnerStatus(winner.id, { contactStatus: "contacted" })}>
+        {t(language, "contact")}
+      </Button>
+      <Button size="sm" variant="secondary" onClick={() => updateWinnerStatus(winner.id, { travelStatus: "coordinated" })}>
+        {t(language, "coordinateTravel")}
+      </Button>
+      <Button size="sm" variant="secondary" onClick={() => updateWinnerStatus(winner.id, { ceremonyStatus: "confirmed" })}>
+        {t(language, "confirmCeremony")}
+      </Button>
+      <Button size="sm" onClick={() => updateWinnerStatus(winner.id, { published: !winner.published })}>
+        {winner.published ? t(language, "unpublish") : t(language, "publish")}
+      </Button>
+    </div>
+  );
+  const renderWinnerSlot = (winner: Entry | undefined, index: number) => {
+    const place = index + 1;
+
+    if (!winner) {
+      return (
+        <div key={`pending-${place}`} className="sketch-note border-dashed p-4">
+          <div className="grid gap-3 lg:grid-cols-[4rem_1fr] lg:items-center">
+            <span className="text-2xl font-bold text-[var(--ink)]">#{place}</span>
+            <div>
+              <p className="font-bold text-[var(--ink)]">{language === "ar" ? `في انتظار الفائز رقم ${place}` : `Waiting for winner #${place}`}</p>
+              <p className="text-sm text-[var(--graphite)]">
+                {language === "ar" ? "سيظهر هنا بمجرد اكتمال نتائج هذا النوع" : "This slot fills when this type has enough scored entries"}
+              </p>
+            </div>
+          </div>
         </div>
-      )
-    },
-    {
-      key: "track",
-      header: t(language, "track"),
-      cell: (row) => tracks.find((track) => track.id === row.trackId)?.name[language] ?? row.trackId
-    },
-    {
-      key: "score",
-      header: t(language, "score"),
-      cell: (row) => row.finalScore.toFixed(2)
-    },
-    {
-      key: "awareness",
-      header: language === "ar" ? "أثر التوعية" : "Awareness",
-      cell: (row) => row.awarenessScore.toFixed(2)
-    },
-    {
-      key: "ops",
-      header: language === "ar" ? "التواصل والسفر" : "Contact and travel",
-      cell: (row) => (
-        <div className="flex flex-wrap gap-1">
-          <Badge tone={row.contactStatus === "responded" ? "success" : row.contactStatus === "contacted" ? "info" : "neutral"}>{row.contactStatus}</Badge>
-          <Badge tone={row.travelStatus === "coordinated" ? "success" : "neutral"}>{row.travelStatus}</Badge>
-          <Badge tone={row.ceremonyStatus === "confirmed" ? "success" : "warning"}>{row.ceremonyStatus}</Badge>
-        </div>
-      )
-    },
-    {
-      key: "actions",
-      header: t(language, "actions"),
-      cell: (row) => (
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="secondary" onClick={() => updateWinnerStatus(row.id, { contactStatus: "contacted" })}>{t(language, "contact")}</Button>
-          <Button size="sm" variant="secondary" onClick={() => updateWinnerStatus(row.id, { travelStatus: "coordinated" })}>{t(language, "coordinateTravel")}</Button>
-          <Button size="sm" variant="secondary" onClick={() => updateWinnerStatus(row.id, { ceremonyStatus: "confirmed" })}>{t(language, "confirmCeremony")}</Button>
-          <Button size="sm" onClick={() => updateWinnerStatus(row.id, { published: !row.published })}>{row.published ? t(language, "unpublish") : t(language, "publish")}</Button>
-        </div>
-      )
+      );
     }
-  ];
+
+    return (
+      <div key={winner.id} className="border-b border-dashed border-[var(--muted-line)] pb-3 last:border-b-0 last:pb-0">
+        <div className="grid gap-3 lg:grid-cols-[4rem_1fr_auto] lg:items-start">
+          <span className="text-2xl font-bold text-[var(--ink)]">#{place}</span>
+          <div>
+            <p className="font-bold text-[var(--ink)]">{winner.participantName}</p>
+            <p className="text-sm text-[var(--graphite)]">{winner.title}</p>
+            <p className="mt-1 text-xs text-[var(--ink-soft)]">{winner.id}</p>
+          </div>
+          <div className="flex flex-wrap gap-1 lg:justify-end">
+            <Badge tone="neutral">{winner.finalScore.toFixed(2)}</Badge>
+            <Badge tone="neutral">{language === "ar" ? `أثر ${winner.awarenessScore.toFixed(2)}` : `Impact ${winner.awarenessScore.toFixed(2)}`}</Badge>
+            <Badge tone={winner.contactStatus === "responded" ? "success" : winner.contactStatus === "contacted" ? "info" : "neutral"}>{winner.contactStatus}</Badge>
+            <Badge tone={winner.travelStatus === "coordinated" ? "success" : "neutral"}>{winner.travelStatus}</Badge>
+            <Badge tone={winner.ceremonyStatus === "confirmed" ? "success" : "warning"}>{winner.ceremonyStatus}</Badge>
+          </div>
+        </div>
+        <div className="mt-3">{renderWinnerActions(winner)}</div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-5">
       <div className="sketch-card flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-sm font-semibold text-slate-500">{language === "ar" ? "الفائزون الإجماليون وحسب المسار" : "Overall and track winners"}</p>
-          <p className="text-3xl font-bold text-navy-900">{ranked.length}</p>
+          <p className="text-sm font-semibold text-slate-500">{language === "ar" ? "الفائزون حسب كل نوع" : "Winners by category type"}</p>
+          <p className="text-3xl font-bold text-navy-900">{winnerCount}</p>
         </div>
         <Button asChild variant="burgundy">
           <Link href="/winners/announcement">
@@ -99,7 +131,94 @@ export function WinnersView() {
           </Link>
         </Button>
       </div>
-      <DataTable rows={ranked} columns={columns} />
+      <div className="grid gap-5 xl:grid-cols-2">
+        {winnerGroups.map((trackGroup) =>
+          trackGroup.groups.map((group) => (
+            <Card key={group.id} className="overflow-hidden">
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle>{`${localized(language, trackGroup.track.name)} - ${group.label}`}</CardTitle>
+                  <p className="mt-1 text-sm font-semibold text-[var(--graphite)]">
+                    {language === "ar" ? "أول 3 فائزين في هذا النوع" : "Top 3 winners in this type"}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone="neutral">{group.winners.length}/3</Badge>
+                  <Button size="sm" variant="secondary" onClick={() => setSelectedGroupId(group.id)}>
+                    <List className="h-4 w-4" />
+                    {language === "ar" ? "القائمة كاملة" : "Full list"}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {Array.from({ length: 3 }, (_, index) => renderWinnerSlot(group.winners[index], index))}
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+      <Dialog
+        open={Boolean(selectedWinnerGroup)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedGroupId("");
+          }
+        }}
+        title={
+          selectedWinnerGroup
+            ? `${localized(language, selectedWinnerGroup.track.name)} - ${selectedWinnerGroup.label} - ${
+                language === "ar" ? "القائمة النهائية الكاملة" : "Full final list"
+              }`
+            : ""
+        }
+        className="w-[min(96vw,1160px)]"
+      >
+        {selectedWinnerGroup ? (
+          <div className="space-y-4">
+            <div className="sketch-note flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="font-bold text-[var(--ink)]">
+                  {language === "ar" ? "كل الأعمال مرتبة داخل هذا النوع" : "All entries ranked inside this type"}
+                </p>
+                <p className="mt-1 text-sm text-[var(--graphite)]">
+                  {language === "ar"
+                    ? `الفائزون هم أول 3 من أصل ${selectedWinnerGroup.rankedEntries.length}`
+                    : `Winners are the top 3 of ${selectedWinnerGroup.rankedEntries.length}`}
+                </p>
+              </div>
+              <Badge tone="neutral">{selectedWinnerGroup.rankedEntries.length}</Badge>
+            </div>
+
+            <div className="max-h-[62vh] overflow-auto">
+              <div className="space-y-2">
+                {selectedWinnerGroup.rankedEntries.length ? (
+                  selectedWinnerGroup.rankedEntries.map((entry) => (
+                    <div key={entry.id} className="sketch-note p-4">
+                      <div className="grid gap-3 lg:grid-cols-[4rem_1fr_auto] lg:items-center">
+                        <span className="text-2xl font-bold text-[var(--ink)]">#{entry.rank}</span>
+                        <div>
+                          <p className="font-bold text-[var(--ink)]">{entry.participantName}</p>
+                          <p className="text-sm text-[var(--graphite)]">{entry.title}</p>
+                          <p className="mt-1 text-xs text-[var(--ink-soft)]">{entry.id}</p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                          <Badge tone={entry.rank <= 3 ? "success" : "neutral"}>
+                            {entry.rank <= 3 ? (language === "ar" ? "فائز" : "Winner") : language === "ar" ? "خارج أول 3" : "Outside top 3"}
+                          </Badge>
+                          <Badge tone="neutral">{entry.finalScore.toFixed(2)}</Badge>
+                          <Badge tone="neutral">{language === "ar" ? `أثر ${entry.awarenessScore.toFixed(2)}` : `Impact ${entry.awarenessScore.toFixed(2)}`}</Badge>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <EmptyState title={language === "ar" ? "لا توجد نتائج محسوبة لهذا النوع" : "No scored entries for this type"} />
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </Dialog>
     </div>
   );
 }
