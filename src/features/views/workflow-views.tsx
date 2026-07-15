@@ -607,29 +607,139 @@ export function TieBreakingView() {
   const role = useDemoStore((state) => state.role);
   const tieCases = useDemoStore((state) => state.tieCases);
   const entries = useDemoStore((state) => state.entries);
+  const committees = useDemoStore((state) => state.committees);
   const evaluators = useDemoStore((state) => state.evaluators);
   const castTieVote = useDemoStore((state) => state.castTieVote);
   const closeTieVoting = useDemoStore((state) => state.closeTieVoting);
   const manualResolveTie = useDemoStore((state) => state.manualResolveTie);
-  const voter = evaluators[0];
+  const [voterIdsByTie, setVoterIdsByTie] = useState<Record<string, string>>({});
+  const [selectedTieId, setSelectedTieId] = useState("");
+  const [tieSearch, setTieSearch] = useState("");
   const canVote = can(role, "submitFinalEvaluation");
   const canResolve = can(role, "manageCommittees");
+  const normalizedTieSearch = tieSearch.trim().toLowerCase();
+  const visibleTieCases = tieCases.filter((tieCase) => {
+    if (!normalizedTieSearch) {
+      return true;
+    }
+    const tiedEntries = tieCase.entryIds.map((id) => entries.find((entry) => entry.id === id)).filter((entry): entry is Entry => Boolean(entry));
+    const text = `${tieCase.id} ${tieCase.reason} ${tiedEntries.map((entry) => `${entry.participantName} ${entry.title} ${entry.id}`).join(" ")}`.toLowerCase();
+    return text.includes(normalizedTieSearch);
+  });
+  const selectedTieCase = tieCases.find((tieCase) => tieCase.id === selectedTieId);
+  const selectedTiedEntries = selectedTieCase
+    ? selectedTieCase.entryIds.map((id) => entries.find((entry) => entry.id === id)).filter((entry): entry is Entry => Boolean(entry))
+    : [];
+  const selectedTrackId = selectedTiedEntries[0]?.trackId;
+  const selectedCommittee = selectedTrackId ? committees.find((item) => item.trackId === selectedTrackId) : undefined;
+  const selectedTieVoters =
+    selectedCommittee?.members
+      .map((member) => evaluators.find((evaluator) => evaluator.id === member.evaluatorId))
+      .filter((evaluator): evaluator is NonNullable<typeof evaluator> => Boolean(evaluator)) ?? evaluators;
+  const selectedActiveVoterId = selectedTieCase ? (voterIdsByTie[selectedTieCase.id] ?? selectedTieVoters[0]?.id ?? "") : "";
+  const selectedActiveVoter = selectedTieVoters.find((evaluator) => evaluator.id === selectedActiveVoterId);
+  const selectedActiveVote = selectedTieCase?.votes.find((vote) => vote.evaluatorId === selectedActiveVoterId);
+  const selectedVoteWinner = selectedTieCase ? committeeVoteWinner(selectedTieCase) : null;
+  const selectedWinnerEntry = selectedTiedEntries.find((entry) => entry.id === (selectedVoteWinner ?? selectedTieCase?.manualWinnerId));
+  const selectedProgressTotal = Math.max(1, selectedTieVoters.length);
+  const selectedProgressValue = selectedTieCase ? Math.min(100, (selectedTieCase.votes.length / selectedProgressTotal) * 100) : 0;
 
   return (
     <div className="space-y-5">
-      {tieCases.map((tieCase) => {
+      <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+        <div className="space-y-2">
+          <Label htmlFor="tie-case-search">{language === "ar" ? "حالات التعادل" : "Tie cases"}</Label>
+          <div className="relative">
+            <Search className={`pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 ${language === "ar" ? "right-3" : "left-3"}`} />
+            <Input
+              id="tie-case-search"
+              value={tieSearch}
+              onChange={(event) => setTieSearch(event.target.value)}
+              placeholder={language === "ar" ? "ابحث باسم المشارك أو كود الحالة" : "Search by participant or tie case"}
+              className={language === "ar" ? "pr-10" : "pl-10"}
+            />
+          </div>
+        </div>
+        <div className="sketch-note p-3 text-sm">
+          <p className="font-bold text-[var(--ink)]">{language === "ar" ? "نتائج القائمة" : "List results"}</p>
+          <p className="mt-1 text-[var(--ink-soft)]">
+            {language === "ar" ? `${visibleTieCases.length} من ${tieCases.length}` : `${visibleTieCases.length} of ${tieCases.length}`}
+          </p>
+        </div>
+      </div>
+
+      {visibleTieCases.map((tieCase) => {
         const tiedEntries = tieCase.entryIds.map((id) => entries.find((entry) => entry.id === id)).filter((entry): entry is Entry => Boolean(entry));
+        const participantNames = tiedEntries.map((entry) => entry.participantName).join(" × ");
+        const trackId = tiedEntries[0]?.trackId;
+        const committee = trackId ? committees.find((item) => item.trackId === trackId) : undefined;
+        const tieVoters =
+          committee?.members
+            .map((member) => evaluators.find((evaluator) => evaluator.id === member.evaluatorId))
+            .filter((evaluator): evaluator is NonNullable<typeof evaluator> => Boolean(evaluator)) ?? evaluators;
+        const activeVoterId = voterIdsByTie[tieCase.id] ?? tieVoters[0]?.id ?? "";
+        const activeVoter = tieVoters.find((evaluator) => evaluator.id === activeVoterId);
+        const activeVote = tieCase.votes.find((vote) => vote.evaluatorId === activeVoterId);
         const voteWinner = committeeVoteWinner(tieCase);
+        const winnerEntry = tiedEntries.find((entry) => entry.id === (voteWinner ?? tieCase.manualWinnerId));
+        const progressTotal = Math.max(1, tieVoters.length);
+        const progressValue = Math.min(100, (tieCase.votes.length / progressTotal) * 100);
         return (
-          <Card key={tieCase.id}>
+          <Card
+            key={tieCase.id}
+            role="button"
+            tabIndex={0}
+            className="cursor-pointer transition hover:-translate-y-0.5"
+            onClick={() => setSelectedTieId(tieCase.id)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setSelectedTieId(tieCase.id);
+              }
+            }}
+          >
             <CardHeader>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <CardTitle>{tieCase.id} · {tieCase.reason}</CardTitle>
-                <Badge tone={tieCase.status === "resolved" ? "success" : "warning"}>{tieCase.status}</Badge>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <CardTitle>{participantNames || tieCase.id}</CardTitle>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {tieCase.id} · {trackId ?? "-"} · {language === "ar" ? `${tiedEntries.length} أسماء بينهم تعادل` : `${tiedEntries.length} tied participants`}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge tone={tieCase.status === "resolved" ? "success" : "warning"}>{tieCase.status}</Badge>
+                  <Badge tone="neutral">{tieCase.votes.length}/{tieVoters.length}</Badge>
+                </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-2">
+            <CardContent className="hidden">
+              <div className="grid gap-3 lg:grid-cols-[1fr_0.7fr]">
+                <div className="sketch-note p-3 text-sm">
+                  <p className="font-bold text-[var(--ink)]">
+                    {language === "ar" ? `حالة تعادل تضم ${tiedEntries.length} أعمال` : `${tiedEntries.length} tied entries`}
+                  </p>
+                  <p className="mt-1 text-[var(--ink-soft)]">
+                    {language === "ar" ? "المسار" : "Track"}: {trackId ?? "-"}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`tie-voter-${tieCase.id}`}>{language === "ar" ? "المحكم المصوّت" : "Voting evaluator"}</Label>
+                  <Select
+                    id={`tie-voter-${tieCase.id}`}
+                    value={activeVoterId}
+                    disabled={!canVote || tieCase.status !== "voting"}
+                    onChange={(event) => setVoterIdsByTie((current) => ({ ...current, [tieCase.id]: event.target.value }))}
+                  >
+                    {tieVoters.map((evaluator) => (
+                      <option key={evaluator.id} value={evaluator.id}>
+                        {evaluator.fullName}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-3">
                 {tiedEntries.map((entry) => (
                   <div key={entry.id} className="sketch-note p-4">
                     <p className="font-bold text-navy-900">{entry.title}</p>
@@ -638,10 +748,15 @@ export function TieBreakingView() {
                       <InfoLine label={language === "ar" ? "الدرجة النهائية" : "Final score"} value={entry.finalScore.toFixed(2)} />
                       <InfoLine label={language === "ar" ? "أثر التوعية" : "Awareness"} value={entry.awarenessScore.toFixed(2)} />
                     </div>
+                    {activeVote?.entryId === entry.id ? (
+                      <Badge tone="success" className="mt-3">
+                        {language === "ar" ? "اختيار المحكم الحالي" : "Current evaluator choice"}
+                      </Badge>
+                    ) : null}
                     <div className="mt-4 flex flex-wrap gap-2">
-                      <Button disabled={!canVote || tieCase.status !== "voting"} onClick={() => castTieVote(tieCase.id, voter.id, entry.id)}>
+                      <Button disabled={!canVote || tieCase.status !== "voting" || !activeVoterId} onClick={() => castTieVote(tieCase.id, activeVoterId, entry.id)}>
                         <ThumbsUp className="h-4 w-4" />
-                        {language === "ar" ? "تصويت" : "Vote"}
+                        {activeVote?.entryId === entry.id ? (language === "ar" ? "صوتك الحالي" : "Your vote") : language === "ar" ? "صوّت لهذا العمل" : "Vote for this entry"}
                       </Button>
                       <Button disabled={!canResolve} variant="secondary" onClick={() => manualResolveTie(tieCase.id, entry.id)}>
                         {t(language, "manualResolve")}
@@ -653,20 +768,26 @@ export function TieBreakingView() {
               <div className="sketch-note p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="font-semibold text-slate-700">
-                    {language === "ar" ? "تقدم التصويت" : "Voting progress"} · {tieCase.votes.length}/{evaluators.length}
+                    {language === "ar" ? "تقدم التصويت" : "Voting progress"} · {tieCase.votes.length}/{tieVoters.length}
                   </p>
                   <Button disabled={!canResolve || tieCase.status !== "voting"} onClick={() => closeTieVoting(tieCase.id)}>
                     {t(language, "closeVoting")}
                   </Button>
                 </div>
-                <Progress value={(tieCase.votes.length / Math.max(1, evaluators.length)) * 100} className="mt-3" />
+                <Progress value={progressValue} className="mt-3" />
                 {tieCase.status !== "voting" ? (
                   <p className="mt-3 text-sm text-slate-600">
-                    {language === "ar" ? "الفائز حسب التصويت:" : "Vote winner:"} {voteWinner ?? tieCase.manualWinnerId ?? "-"}
+                    {language === "ar" ? "الفائز حسب التصويت:" : "Vote winner:"} {winnerEntry ? `${winnerEntry.id} · ${winnerEntry.title}` : "-"}
                   </p>
                 ) : (
                   <p className="mt-3 text-sm text-slate-500">
-                    {language === "ar" ? "يتم إخفاء المجاميع الحية حتى إغلاق التصويت." : "Live totals are hidden until voting closes."}
+                    {activeVote
+                      ? language === "ar"
+                        ? `اختيار ${activeVoter?.fullName ?? ""} الحالي: ${tiedEntries.find((entry) => entry.id === activeVote.entryId)?.title ?? activeVote.entryId}`
+                        : `${activeVoter?.fullName ?? "Current voter"} selected: ${tiedEntries.find((entry) => entry.id === activeVote.entryId)?.title ?? activeVote.entryId}`
+                      : language === "ar"
+                        ? "اختر المحكم ثم اضغط صوّت لهذا العمل لتسجيل الصوت."
+                        : "Choose an evaluator, then vote for one entry."}
                   </p>
                 )}
               </div>
@@ -674,6 +795,106 @@ export function TieBreakingView() {
           </Card>
         );
       })}
+
+      {selectedTieCase ? (
+        <Dialog
+          open={Boolean(selectedTieCase)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedTieId("");
+            }
+          }}
+          title={language === "ar" ? "التصويت على حالة التعادل" : "Vote on tie case"}
+          className="w-[min(96vw,980px)]"
+        >
+          <div className="space-y-4">
+            <div className="sketch-note p-4">
+              <p className="text-lg font-bold text-[var(--ink)]">
+                {selectedTiedEntries.map((entry) => entry.participantName).join(" × ")}
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                {selectedTieCase.id} · {selectedTrackId ?? "-"} · {selectedTieCase.reason}
+              </p>
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-[1fr_0.8fr]">
+              <div className="space-y-2">
+                <Label htmlFor={`selected-tie-voter-${selectedTieCase.id}`}>{language === "ar" ? "المحكم المصوّت" : "Voting evaluator"}</Label>
+                <Select
+                  id={`selected-tie-voter-${selectedTieCase.id}`}
+                  value={selectedActiveVoterId}
+                  disabled={!canVote || selectedTieCase.status !== "voting"}
+                  onChange={(event) => setVoterIdsByTie((current) => ({ ...current, [selectedTieCase.id]: event.target.value }))}
+                >
+                  {selectedTieVoters.map((evaluator) => (
+                    <option key={evaluator.id} value={evaluator.id}>
+                      {evaluator.fullName}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="sketch-note p-3 text-sm">
+                <p className="font-bold text-[var(--ink)]">{language === "ar" ? "تقدم التصويت" : "Voting progress"}</p>
+                <p className="mt-1 text-[var(--ink-soft)]">
+                  {selectedTieCase.votes.length}/{selectedTieVoters.length}
+                </p>
+                <Progress value={selectedProgressValue} className="mt-2" />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {selectedTiedEntries.map((entry) => (
+                <div key={entry.id} className="sketch-note p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-base font-bold text-navy-900">{entry.participantName}</p>
+                      <p className="mt-1 text-sm text-slate-500">{entry.title} · {entry.id}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge tone="neutral">{entry.finalScore.toFixed(2)}</Badge>
+                      {selectedTieCase.status !== "voting" ? (
+                        <Badge tone="info">
+                          {language === "ar" ? "الأصوات" : "Votes"} {selectedTieCase.votes.filter((vote) => vote.entryId === entry.id).length}
+                        </Badge>
+                      ) : null}
+                      {selectedActiveVote?.entryId === entry.id ? <Badge tone="success">{language === "ar" ? "اختيار المحكم الحالي" : "Current choice"}</Badge> : null}
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button
+                      disabled={!canVote || selectedTieCase.status !== "voting" || !selectedActiveVoterId}
+                      onClick={() => castTieVote(selectedTieCase.id, selectedActiveVoterId, entry.id)}
+                    >
+                      <ThumbsUp className="h-4 w-4" />
+                      {selectedActiveVote?.entryId === entry.id ? (language === "ar" ? "صوتك الحالي" : "Your vote") : language === "ar" ? "صوّت لهذا الاسم" : "Vote for this name"}
+                    </Button>
+                    <Button disabled={!canResolve} variant="secondary" onClick={() => manualResolveTie(selectedTieCase.id, entry.id)}>
+                      {t(language, "manualResolve")}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-slate-500">
+                {selectedTieCase.status !== "voting"
+                  ? `${language === "ar" ? "الفائز:" : "Winner:"} ${selectedWinnerEntry ? selectedWinnerEntry.participantName : "-"}`
+                  : selectedActiveVote
+                    ? `${language === "ar" ? "اختيار" : "Selected"} ${selectedActiveVoter?.fullName ?? ""}: ${
+                        selectedTiedEntries.find((entry) => entry.id === selectedActiveVote.entryId)?.participantName ?? selectedActiveVote.entryId
+                      }`
+                    : language === "ar"
+                      ? "اختر المحكم ثم صوّت لأحد الأسماء."
+                      : "Choose an evaluator, then vote for one name."}
+              </p>
+              <Button disabled={!canResolve || selectedTieCase.status !== "voting"} onClick={() => closeTieVoting(selectedTieCase.id)}>
+                {t(language, "closeVoting")}
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      ) : null}
     </div>
   );
 }
