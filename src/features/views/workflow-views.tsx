@@ -60,7 +60,6 @@ export function FilteringView() {
   const [aiChecks, setAiChecks] = useState(defaultAiScreenChecks);
   const [aiFindings, setAiFindings] = useState<Record<AiScreenQuestion, boolean> | null>(null);
   const [aiScreenResults, setAiScreenResults] = useState<Record<string, Record<AiScreenQuestion, boolean>>>({});
-  const [aiScreenFindingCounts, setAiScreenFindingCounts] = useState<Record<string, Record<AiScreenQuestion, number>>>({});
   const [aiFindingFilter, setAiFindingFilter] = useState<AiFindingFilter>("all");
   const [aiFilterOpen, setAiFilterOpen] = useState(false);
   const [aiAction, setAiAction] = useState<AiScreenAction>("return");
@@ -192,18 +191,47 @@ export function FilteringView() {
       return searchedRows.length;
     }
 
-    return searchedRows.reduce((total, entry) => {
-      const counts = aiScreenFindingCounts[entry.id];
-      if (!counts) {
-        return total;
+    return searchedRows.filter((entry) => {
+      const result = aiScreenResults[entry.id];
+      if (!result) {
+        return false;
       }
-
       if (filter === "flagged") {
-        return total + aiQuestionKeys.reduce((entryTotal, key) => entryTotal + counts[key], 0);
+        return aiQuestionKeys.some((key) => result[key]);
       }
+      return result[filter];
+    }).length;
+  }
 
-      return total + counts[filter];
-    }, 0);
+  function aiFilterBadgeClass(filter: AiFindingFilter) {
+    return filter === "all" ? "bg-[var(--accent-green)]" : "bg-red-600";
+  }
+
+  function buildAiScreeningBatch(seedEntry: Entry, resultCount: number) {
+    const seedFindings = mockAiScreen(seedEntry, aiChecks);
+    const foundKeys = aiQuestionKeys.filter((key) => seedFindings[key]);
+
+    if (foundKeys.length === 0) {
+      return { [seedEntry.id]: seedFindings };
+    }
+
+    const seedIndex = Math.max(0, searchedRows.findIndex((entry) => entry.id === seedEntry.id));
+    const orderedRows = [...searchedRows.slice(seedIndex), ...searchedRows.slice(0, seedIndex)];
+    const targetRows = orderedRows.slice(0, Math.min(resultCount, orderedRows.length));
+
+    return targetRows.reduce<Record<string, Record<AiScreenQuestion, boolean>>>((batch, entry) => {
+      batch[entry.id] = {
+        similarDesigns: foundKeys.includes("similarDesigns"),
+        badWords: foundKeys.includes("badWords"),
+        inappropriateImage: foundKeys.includes("inappropriateImage"),
+        emptyContent: foundKeys.includes("emptyContent")
+      };
+      return batch;
+    }, {});
+  }
+
+  function aiScreeningBatchMatchCount(batch: Record<string, Record<AiScreenQuestion, boolean>>) {
+    return Object.values(batch).filter((result) => aiQuestionKeys.some((key) => result[key])).length;
   }
 
   const aiFilterOptions: Array<{ value: AiFindingFilter; label: string; count: number }> = [
@@ -215,7 +243,7 @@ export function FilteringView() {
     { value: "emptyContent", label: language === "ar" ? "محتوى فارغ" : "Empty content", count: aiFilterCount("emptyContent") }
   ];
   const selectedAiFilter = aiFilterOptions.find((option) => option.value === aiFindingFilter) ?? aiFilterOptions[0];
-  const hasAiScreenedEntries = Object.keys(aiScreenFindingCounts).length > 0;
+  const hasAiScreenedEntries = Object.keys(aiScreenResults).length > 0;
 
   function clearAiScanTimers() {
     if (aiScanTimerRef.current !== null) {
@@ -271,11 +299,12 @@ export function FilteringView() {
       clearAiScanTimers();
       const findings = mockAiScreen(aiEntry, aiChecks);
       const resultCount = mockAiResultCount(aiEntry);
+      const screeningBatch = buildAiScreeningBatch(aiEntry, resultCount);
+      const matchedCount = aiScreeningBatchMatchCount(screeningBatch);
       const foundAnything = aiQuestionKeys.some((key) => findings[key]);
       setAiFindings(findings);
-      setAiScreenResults((current) => ({ ...current, [aiEntry.id]: findings }));
-      setAiScreenFindingCounts((current) => ({ ...current, [aiEntry.id]: mockAiFindingCounts(aiEntry, aiChecks, resultCount) }));
-      setAiResultCount(resultCount);
+      setAiScreenResults((current) => ({ ...current, ...screeningBatch }));
+      setAiResultCount(matchedCount);
       setAiAction(foundAnything ? "return" : "none");
       setAiScanning(false);
       setAiScanCountdown(3);
@@ -321,7 +350,7 @@ export function FilteringView() {
                 <span className="flex items-center gap-2">
                   <span>{selectedAiFilter.label}</span>
                   {selectedAiFilter.count > 0 ? (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-black leading-none text-white">
+                    <span className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-black leading-none text-white ${aiFilterBadgeClass(selectedAiFilter.value)}`}>
                       {selectedAiFilter.count}
                     </span>
                   ) : null}
@@ -349,7 +378,7 @@ export function FilteringView() {
                     >
                       <span>{option.label}</span>
                       {option.count > 0 ? (
-                        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-black leading-none text-white">
+                        <span className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-black leading-none text-white ${aiFilterBadgeClass(option.value)}`}>
                           {option.count}
                         </span>
                       ) : null}
@@ -1505,31 +1534,6 @@ function mockAiScreen(entry: Entry, enabled: Record<AiScreenQuestion, boolean>):
     inappropriateImage: enabled.inappropriateImage && (entry.trackId === "drawing" || entry.trackId === "photography") && serial % 5 === 0,
     emptyContent: enabled.emptyContent && (serial % 11 === 0 || entry.title.trim().length < 8)
   };
-}
-
-function mockAiFindingCounts(entry: Entry, enabled: Record<AiScreenQuestion, boolean>, resultCount: number): Record<AiScreenQuestion, number> {
-  const findings = mockAiScreen(entry, enabled);
-  const foundKeys = aiQuestionKeys.filter((key) => findings[key]);
-  const counts: Record<AiScreenQuestion, number> = {
-    similarDesigns: 0,
-    badWords: 0,
-    inappropriateImage: 0,
-    emptyContent: 0
-  };
-
-  if (foundKeys.length === 0) {
-    return counts;
-  }
-
-  const baseCount = Math.floor(resultCount / foundKeys.length);
-  let remaining = resultCount;
-  foundKeys.forEach((key, index) => {
-    const count = index === foundKeys.length - 1 ? remaining : baseCount;
-    counts[key] = count;
-    remaining -= count;
-  });
-
-  return counts;
 }
 
 function mockAiResultCount(entry: Entry) {
