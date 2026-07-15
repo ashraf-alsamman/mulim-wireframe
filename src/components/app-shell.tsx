@@ -31,7 +31,7 @@ import { LanguageSwitcher, RoleSwitcher } from "@/components/switchers";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { navItems, roleLabels, t } from "@/i18n/translations";
+import { navItems, t } from "@/i18n/translations";
 import { useDemoStore } from "@/store/demo-store";
 import type { DemoStateSnapshot } from "@/types/demo";
 import { cn } from "@/utils/cn";
@@ -126,13 +126,46 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   const sidebar = (
-    <aside className="sketch-paper flex h-full w-72 flex-col border-e-2 border-[var(--line)] text-[var(--ink)]">
-      <div className="sketch-doodle border-b-2 border-dashed border-[var(--muted-line)] p-5">
-        <p className="text-xs font-bold uppercase tracking-wider text-[var(--ink)]">{language === "ar" ? "لوحة اللجان" : "Committee Console"}</p>
-        <h1 className="mt-2 text-lg font-bold leading-6">{t(language, "appName")}</h1>
-        <p className="mt-3 text-xs text-[var(--graphite)]">{roleLabels[role][language]}</p>
+    <aside className="flex h-full w-full flex-col gap-3 text-[var(--ink)]">
+      <div className="px-2">
+        <div className="flex items-center gap-3">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-[20px] bg-[var(--ink)] text-[var(--paper-soft)] shadow-sm">
+            <Trophy className="h-6 w-6" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--accent-green)]">
+              {language === "ar" ? "لوحة اللجان" : "Committee Console"}
+            </p>
+            <h1 className="mt-1 line-clamp-2 text-base font-black leading-5">{t(language, "appName")}</h1>
+          </div>
+        </div>
       </div>
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+
+      <div className="sketch-card flex items-center justify-around gap-2 p-2">
+        <Button variant="ghost" size="icon" onClick={() => setNotificationsOpen(true)} aria-label={t(language, "notifications")}>
+          <Bell className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={exportJson} aria-label={t(language, "exportData")}>
+          <Download className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} aria-label={t(language, "importData")}>
+          <Upload className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => {
+            if (window.confirm(language === "ar" ? "هل تريد إعادة ضبط بيانات العرض؟" : "Reset demo data?")) {
+              resetDemoData();
+            }
+          }}
+          aria-label={t(language, "reset")}
+        >
+          <RotateCcw className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <nav className="sketch-card flex-1 space-y-0.5 overflow-visible p-2">
         {navItems.map((item) => {
           const Icon = iconMap[item.icon];
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -144,85 +177,99 @@ export function AppShell({ children }: { children: ReactNode }) {
               href={item.href}
               onClick={() => setSidebarOpen(false)}
               className={cn(
-                "flex items-center gap-3 rounded-[12px_10px_14px_9px] border-2 border-transparent px-3 py-2.5 text-sm font-bold text-[var(--ink-soft)] transition hover:border-[var(--line)] hover:bg-[var(--paper-warm)] hover:text-[var(--ink)]",
-                active && "border-[var(--line)] bg-[var(--paper-soft)] text-[var(--ink)] shadow-[2px_2px_0_rgba(0,0,0,0.14)]",
+                "flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-bold text-[var(--ink-soft)] transition hover:bg-[var(--paper-warm)] hover:text-[var(--accent-green)]",
+                active && "bg-[var(--paper-warm)] text-[var(--accent-green)]",
                 dimmed && "opacity-55"
               )}
             >
-              <Icon className="h-4 w-4 shrink-0" />
+              <span
+                className={cn(
+                  "grid h-7 w-7 shrink-0 place-items-center rounded-2xl bg-[var(--paper)] text-[var(--graphite)]",
+                  active && "bg-[var(--paper-soft)] text-[var(--accent-green)]"
+                )}
+              >
+                <Icon className="h-4 w-4" />
+              </span>
               <span>{t(language, item.key)}</span>
             </Link>
           );
         })}
       </nav>
+
     </aside>
   );
 
   return (
     <div className="sketch-app min-h-screen text-[var(--ink)]">
-      <div className="hidden lg:fixed lg:inset-y-0 lg:flex">{sidebar}</div>
-      {sidebarOpen ? (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <button className="absolute inset-0 bg-[rgba(0,0,0,0.34)]" aria-label="Close menu" onClick={() => setSidebarOpen(false)} />
-          <div className="relative h-full w-72">{sidebar}</div>
+      <div className="mx-auto grid min-h-screen max-w-[1320px] gap-6 px-4 py-5 lg:grid-cols-[270px_minmax(0,1fr)]">
+        <div className="hidden lg:block">
+          <div className="sticky top-5 h-[calc(100vh-40px)]">{sidebar}</div>
         </div>
-      ) : null}
-      <div className="lg:ps-72">
-        <header className="sketch-paper sticky top-0 z-30 border-b-2 border-dashed border-[var(--muted-line)] px-4 py-3 backdrop-blur lg:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
-                <Menu className="h-5 w-5" />
-              </Button>
-              <div>
-                <p className="text-xs font-bold text-[var(--graphite)]">
-                  {t(language, "dashboard")} / {t(language, activeItem.key)}
-                </p>
-                <h2 className="text-xl font-bold text-[var(--ink)]">{t(language, activeItem.key)}</h2>
+
+        {sidebarOpen ? (
+          <div className="fixed inset-0 z-40 lg:hidden">
+            <button className="absolute inset-0 bg-[rgba(15,23,42,0.34)]" aria-label="Close menu" onClick={() => setSidebarOpen(false)} />
+            <div className="relative h-full w-[min(86vw,310px)] bg-[var(--paper)] p-4">{sidebar}</div>
+          </div>
+        ) : null}
+
+        <div className="min-w-0">
+          <header className="sketch-card sticky top-5 z-30 mb-8 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
+                  <Menu className="h-5 w-5" />
+                </Button>
+                <div>
+                  <p className="text-xs font-bold text-[var(--graphite)]">
+                    {t(language, "dashboard")} / {t(language, activeItem.key)}
+                  </p>
+                  <h2 className="text-xl font-black text-[var(--ink)]">{t(language, activeItem.key)}</h2>
+                </div>
               </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <LanguageSwitcher />
-              <RoleSwitcher />
-              <div className="relative">
-                <Button variant="secondary" size="icon" onClick={() => setNotificationsOpen(true)} aria-label={t(language, "notifications")}>
-                  <Bell className="h-4 w-4" />
-                  {unreadCount > 0 ? (
-                    <span className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-[999px_820px_940px_840px] border-2 border-[var(--line)] bg-[var(--ink)] text-[10px] text-[var(--paper-soft)]">
-                      {unreadCount}
-                    </span>
-                  ) : null}
+              <div className="flex flex-wrap items-center gap-2">
+                <LanguageSwitcher />
+                <RoleSwitcher />
+                <div className="relative">
+                  <Button variant="secondary" size="icon" onClick={() => setNotificationsOpen(true)} aria-label={t(language, "notifications")}>
+                    <Bell className="h-4 w-4" />
+                    {unreadCount > 0 ? (
+                      <span className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-[var(--accent-green)] text-[10px] font-black text-[var(--paper-soft)]">
+                        {unreadCount}
+                      </span>
+                    ) : null}
+                  </Button>
+                </div>
+                <Button variant="secondary" size="icon" onClick={exportJson} aria-label={t(language, "exportData")}>
+                  <Download className="h-4 w-4" />
+                </Button>
+                <Button variant="secondary" size="icon" onClick={() => fileInputRef.current?.click()} aria-label={t(language, "importData")}>
+                  <Upload className="h-4 w-4" />
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/json"
+                  hidden
+                  onChange={(event) => importJson(event.target.files?.[0])}
+                />
+                <Button
+                  variant="danger"
+                  size="icon"
+                  onClick={() => {
+                    if (window.confirm(language === "ar" ? "هل تريد إعادة ضبط بيانات العرض؟" : "Reset demo data?")) {
+                      resetDemoData();
+                    }
+                  }}
+                  aria-label={t(language, "reset")}
+                >
+                  <RotateCcw className="h-4 w-4" />
                 </Button>
               </div>
-              <Button variant="secondary" size="icon" onClick={exportJson} aria-label={t(language, "exportData")}>
-                <Download className="h-4 w-4" />
-              </Button>
-              <Button variant="secondary" size="icon" onClick={() => fileInputRef.current?.click()} aria-label={t(language, "importData")}>
-                <Upload className="h-4 w-4" />
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="application/json"
-                hidden
-                onChange={(event) => importJson(event.target.files?.[0])}
-              />
-              <Button
-                variant="danger"
-                size="icon"
-                onClick={() => {
-                  if (window.confirm(language === "ar" ? "هل تريد إعادة ضبط بيانات العرض؟" : "Reset demo data?")) {
-                    resetDemoData();
-                  }
-                }}
-                aria-label={t(language, "reset")}
-              >
-                <RotateCcw className="h-4 w-4" />
-              </Button>
             </div>
-          </div>
-        </header>
-        <main className="px-4 py-5 lg:px-6">{children}</main>
+          </header>
+          <main>{children}</main>
+        </div>
       </div>
       <Dialog open={notificationsOpen} onOpenChange={setNotificationsOpen} title={t(language, "notifications")}>
         <div className="space-y-3">

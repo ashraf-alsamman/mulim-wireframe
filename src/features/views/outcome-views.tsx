@@ -96,23 +96,16 @@ export function WinnersView() {
     }
 
     return (
-      <div key={winner.id} className="border-b border-dashed border-[var(--muted-line)] pb-3 last:border-b-0 last:pb-0">
-        <div className="grid gap-3 lg:grid-cols-[4rem_1fr_auto] lg:items-start">
-          <span className="text-2xl font-bold text-[var(--ink)]">#{place}</span>
-          <div>
-            <p className="font-bold text-[var(--ink)]">{winner.participantName}</p>
-            <p className="text-sm text-[var(--graphite)]">{winner.title}</p>
-            <p className="mt-1 text-xs text-[var(--ink-soft)]">{winner.id}</p>
-          </div>
-          <div className="flex flex-wrap gap-1 lg:justify-end">
-            <Badge tone="neutral">{winner.finalScore.toFixed(2)}</Badge>
-            <Badge tone="neutral">{language === "ar" ? `أثر ${winner.awarenessScore.toFixed(2)}` : `Impact ${winner.awarenessScore.toFixed(2)}`}</Badge>
-            <Badge tone={winner.contactStatus === "responded" ? "success" : winner.contactStatus === "contacted" ? "info" : "neutral"}>{winner.contactStatus}</Badge>
-            <Badge tone={winner.travelStatus === "coordinated" ? "success" : "neutral"}>{winner.travelStatus}</Badge>
-            <Badge tone={winner.ceremonyStatus === "confirmed" ? "success" : "warning"}>{winner.ceremonyStatus}</Badge>
+      <div key={winner.id} className="border-b border-dashed border-[var(--muted-line)] py-4 first:pt-0 last:border-b-0 last:pb-0">
+        <div className="grid gap-3 sm:grid-cols-[3.5rem_1fr] sm:items-start">
+          <span className="text-2xl font-black leading-none text-[var(--ink)]">#{place}</span>
+          <div className="min-w-0">
+            <p className="w-full text-xl font-black leading-7 text-[var(--ink)]">{winner.participantName}</p>
+            <p className="mt-1 text-sm font-semibold text-[var(--graphite)]">{winner.title}</p>
+            <p className="mt-1 text-xs font-bold text-[var(--ink-soft)]">{winner.id}</p>
           </div>
         </div>
-        <div className="mt-3">{renderWinnerActions(winner)}</div>
+        <div className="mt-4 sm:ms-14">{renderWinnerActions(winner)}</div>
       </div>
     );
   };
