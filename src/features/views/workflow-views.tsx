@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, BadgeCheck, Calculator, Check, RotateCcw, Save, Search, Send, ThumbsUp } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Bot, Calculator, Check, ChevronDown, EyeOff, RotateCcw, Save, Search, Send, ThumbsUp } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ScoreInput } from "@/components/score-input";
 import { SearchFilterToolbar } from "@/components/search-filter-toolbar";
@@ -33,22 +33,88 @@ function initialPassThreshold(maxScore: number) {
   return Math.round(maxScore * initialPassRate * 100) / 100;
 }
 
+type AiScreenQuestion = "similarDesigns" | "badWords" | "inappropriateImage" | "emptyContent";
+type AiScreenAction = "none" | "return" | "hide";
+type AiFindingFilter = "all" | "flagged" | AiScreenQuestion;
+
+const aiQuestionKeys: AiScreenQuestion[] = ["similarDesigns", "badWords", "inappropriateImage", "emptyContent"];
+const defaultAiScreenChecks: Record<AiScreenQuestion, boolean> = {
+  similarDesigns: true,
+  badWords: true,
+  inappropriateImage: true,
+  emptyContent: true
+};
+
 export function FilteringView() {
   const language = useDemoStore((state) => state.language);
   const role = useDemoStore((state) => state.role);
   const entries = useDemoStore((state) => state.entries);
   const tracks = useDemoStore((state) => state.tracks);
   const updateFilteringDecision = useDemoStore((state) => state.updateFilteringDecision);
-  const bulkQualifyEntries = useDemoStore((state) => state.bulkQualifyEntries);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Entry | null>(null);
   const [checklist, setChecklist] = useState<FilteringChecklist | null>(null);
   const [notes, setNotes] = useState("");
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiEntryId, setAiEntryId] = useState("");
+  const [aiChecks, setAiChecks] = useState(defaultAiScreenChecks);
+  const [aiFindings, setAiFindings] = useState<Record<AiScreenQuestion, boolean> | null>(null);
+  const [aiScreenResults, setAiScreenResults] = useState<Record<string, Record<AiScreenQuestion, boolean>>>({});
+  const [aiScreenFindingCounts, setAiScreenFindingCounts] = useState<Record<string, Record<AiScreenQuestion, number>>>({});
+  const [aiFindingFilter, setAiFindingFilter] = useState<AiFindingFilter>("all");
+  const [aiFilterOpen, setAiFilterOpen] = useState(false);
+  const [aiAction, setAiAction] = useState<AiScreenAction>("return");
+  const [aiScanning, setAiScanning] = useState(false);
+  const [aiScanCountdown, setAiScanCountdown] = useState(3);
+  const [aiResultCount, setAiResultCount] = useState<number | null>(null);
+  const aiFilterRef = useRef<HTMLDivElement | null>(null);
+  const aiScanTimerRef = useRef<number | null>(null);
+  const aiScanIntervalRef = useRef<number | null>(null);
   const editable = can(role, "filterEntries");
 
-  const rows = entries.filter((entry) => {
+  useEffect(() => {
+    return () => {
+      if (aiScanTimerRef.current !== null) {
+        window.clearTimeout(aiScanTimerRef.current);
+      }
+      if (aiScanIntervalRef.current !== null) {
+        window.clearInterval(aiScanIntervalRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!aiFilterOpen) {
+      return;
+    }
+
+    function closeOnOutsideClick(event: MouseEvent) {
+      if (aiFilterRef.current && !aiFilterRef.current.contains(event.target as Node)) {
+        setAiFilterOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, [aiFilterOpen]);
+
+  const searchedRows = entries.filter((entry) => {
     const text = `${entry.id} ${entry.title} ${entry.participantName}`.toLowerCase();
     return text.includes(search.toLowerCase());
+  });
+  const rows = searchedRows.filter((entry) => {
+    const result = aiScreenResults[entry.id];
+
+    if (aiFindingFilter === "all") {
+      return true;
+    }
+    if (!result) {
+      return false;
+    }
+    if (aiFindingFilter === "flagged") {
+      return aiQuestionKeys.some((key) => result[key]);
+    }
+    return result[aiFindingFilter];
   });
 
   const columns: Array<Column<Entry>> = [
@@ -118,16 +184,345 @@ export function FilteringView() {
     setSelected(null);
   }
 
+  const aiEntry = entries.find((entry) => entry.id === aiEntryId) ?? searchedRows[0] ?? entries[0];
+  const aiFindingKeys = aiFindings ? aiQuestionKeys.filter((key) => aiFindings[key]) : [];
+
+  function aiFilterCount(filter: AiFindingFilter) {
+    if (filter === "all") {
+      return searchedRows.length;
+    }
+
+    return searchedRows.reduce((total, entry) => {
+      const counts = aiScreenFindingCounts[entry.id];
+      if (!counts) {
+        return total;
+      }
+
+      if (filter === "flagged") {
+        return total + aiQuestionKeys.reduce((entryTotal, key) => entryTotal + counts[key], 0);
+      }
+
+      return total + counts[filter];
+    }, 0);
+  }
+
+  const aiFilterOptions: Array<{ value: AiFindingFilter; label: string; count: number }> = [
+    { value: "all", label: language === "ar" ? "كل الأعمال" : "All entries", count: aiFilterCount("all") },
+    { value: "flagged", label: language === "ar" ? "أي ملاحظة مرصودة" : "Any AI finding", count: aiFilterCount("flagged") },
+    { value: "similarDesigns", label: aiQuestionLabel("similarDesigns", language), count: aiFilterCount("similarDesigns") },
+    { value: "badWords", label: aiQuestionLabel("badWords", language), count: aiFilterCount("badWords") },
+    { value: "inappropriateImage", label: aiQuestionLabel("inappropriateImage", language), count: aiFilterCount("inappropriateImage") },
+    { value: "emptyContent", label: language === "ar" ? "محتوى فارغ" : "Empty content", count: aiFilterCount("emptyContent") }
+  ];
+  const selectedAiFilter = aiFilterOptions.find((option) => option.value === aiFindingFilter) ?? aiFilterOptions[0];
+  const hasAiScreenedEntries = Object.keys(aiScreenFindingCounts).length > 0;
+
+  function clearAiScanTimers() {
+    if (aiScanTimerRef.current !== null) {
+      window.clearTimeout(aiScanTimerRef.current);
+      aiScanTimerRef.current = null;
+    }
+    if (aiScanIntervalRef.current !== null) {
+      window.clearInterval(aiScanIntervalRef.current);
+      aiScanIntervalRef.current = null;
+    }
+  }
+
+  function resetAiScanOutput() {
+    clearAiScanTimers();
+    setAiScanning(false);
+    setAiScanCountdown(3);
+    setAiFindings(null);
+    setAiResultCount(null);
+  }
+
+  function closeAiScreening() {
+    resetAiScanOutput();
+    setAiOpen(false);
+  }
+
+  function openAiScreening() {
+    setAiEntryId(searchedRows[0]?.id ?? entries[0]?.id ?? "");
+    setAiChecks(defaultAiScreenChecks);
+    resetAiScanOutput();
+    setAiAction("return");
+    setAiOpen(true);
+  }
+
+  function runAiScreening() {
+    if (!aiEntry || aiScanning) {
+      return;
+    }
+
+    clearAiScanTimers();
+    setAiFindings(null);
+    setAiResultCount(null);
+    setAiAction("none");
+    setAiScanning(true);
+    setAiScanCountdown(3);
+
+    let remainingSeconds = 3;
+    aiScanIntervalRef.current = window.setInterval(() => {
+      remainingSeconds -= 1;
+      setAiScanCountdown(Math.max(remainingSeconds, 1));
+    }, 1000);
+
+    aiScanTimerRef.current = window.setTimeout(() => {
+      clearAiScanTimers();
+      const findings = mockAiScreen(aiEntry, aiChecks);
+      const resultCount = mockAiResultCount(aiEntry);
+      const foundAnything = aiQuestionKeys.some((key) => findings[key]);
+      setAiFindings(findings);
+      setAiScreenResults((current) => ({ ...current, [aiEntry.id]: findings }));
+      setAiScreenFindingCounts((current) => ({ ...current, [aiEntry.id]: mockAiFindingCounts(aiEntry, aiChecks, resultCount) }));
+      setAiResultCount(resultCount);
+      setAiAction(foundAnything ? "return" : "none");
+      setAiScanning(false);
+      setAiScanCountdown(3);
+    }, 3000);
+  }
+
+  function applyAiDecision() {
+    if (!aiEntry || !aiFindings || aiAction === "none") {
+      closeAiScreening();
+      return;
+    }
+
+    const foundLabels = aiFindingKeys.map((key) => aiFindingLabel(key, language)).join(", ");
+    const aiNotes = `${aiEntry.notes}\nAI screening: ${foundLabels || "no issue"}`;
+    const aiChecklist: FilteringChecklist = {
+      relevance: aiFindings.emptyContent ? "failed" : aiEntry.filteringChecklist.relevance,
+      intellectualProperty: aiFindings.similarDesigns ? "review" : aiEntry.filteringChecklist.intellectualProperty,
+      rulesCompliance: aiFindings.badWords || aiFindings.inappropriateImage ? "failed" : aiEntry.filteringChecklist.rulesCompliance
+    };
+
+    updateFilteringDecision(aiEntry.id, aiChecklist, aiAction === "hide" ? "disqualified" : "returned", aiNotes);
+    closeAiScreening();
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <SearchFilterToolbar language={language} search={search} onSearchChange={setSearch} />
-        <Button disabled={!editable} variant="secondary" onClick={bulkQualifyEntries}>
-          <BadgeCheck className="h-4 w-4" />
-          {t(language, "bulkQualify")}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button disabled={!editable || entries.length === 0} variant="secondary" onClick={openAiScreening}>
+            <Bot className="h-4 w-4" />
+            {language === "ar" ? "فحص AI" : "AI check"}
+          </Button>
+          {hasAiScreenedEntries ? (
+            <div ref={aiFilterRef} className="relative w-64" dir={language === "ar" ? "rtl" : "ltr"}>
+              <button
+                type="button"
+                aria-haspopup="listbox"
+                aria-expanded={aiFilterOpen}
+                className="flex h-11 w-full items-center justify-between gap-3 rounded-[18px] border border-[var(--line)] bg-white px-4 text-sm font-semibold text-[var(--ink)] shadow-sm transition hover:border-[var(--accent-green)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-green)]"
+                onClick={() => setAiFilterOpen((open) => !open)}
+              >
+                <span className="flex items-center gap-2">
+                  <span>{selectedAiFilter.label}</span>
+                  {selectedAiFilter.count > 0 ? (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-black leading-none text-white">
+                      {selectedAiFilter.count}
+                    </span>
+                  ) : null}
+                </span>
+                <ChevronDown className={`h-4 w-4 text-[var(--graphite)] transition ${aiFilterOpen ? "rotate-180" : ""}`} />
+              </button>
+              {aiFilterOpen ? (
+                <div
+                  role="listbox"
+                  className="absolute right-0 z-30 mt-2 w-full overflow-hidden rounded-[18px] border border-[var(--line)] bg-white p-1 shadow-[0_18px_40px_rgba(15,23,42,0.16)]"
+                >
+                  {aiFilterOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="option"
+                      aria-selected={option.value === aiFindingFilter}
+                      className={`flex w-full items-center gap-2 rounded-[14px] px-3 py-2 text-sm font-semibold transition ${
+                        option.value === aiFindingFilter ? "bg-[#e3f1f0] text-[var(--accent-green)]" : "text-[var(--ink)] hover:bg-[var(--paper)]"
+                      }`}
+                      onClick={() => {
+                        setAiFindingFilter(option.value);
+                        setAiFilterOpen(false);
+                      }}
+                    >
+                      <span>{option.label}</span>
+                      {option.count > 0 ? (
+                        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-black leading-none text-white">
+                          {option.count}
+                        </span>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       </div>
       <DataTable rows={rows} columns={columns} />
+      <Dialog
+        open={aiOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeAiScreening();
+            return;
+          }
+          setAiOpen(open);
+        }}
+        title={language === "ar" ? "فحص مبدئي بالذكاء الصناعي" : "AI-assisted screening"}
+        className="w-[min(96vw,900px)]"
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeAiScreening}>{t(language, "cancel")}</Button>
+            <Button disabled={aiScanning || !aiFindings || aiAction === "none"} variant={aiAction === "hide" ? "danger" : "secondary"} onClick={applyAiDecision}>
+              {aiAction === "hide" ? <EyeOff className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+              {language === "ar" ? "تطبيق الإجراء" : "Apply action"}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-5">
+          <div className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
+            <div className="space-y-3">
+              <Label>{language === "ar" ? "العمل المطلوب فحصه" : "Entry to screen"}</Label>
+              <Select
+                value={aiEntry?.id ?? ""}
+                disabled={aiScanning}
+                onChange={(event) => {
+                  setAiEntryId(event.target.value);
+                  resetAiScanOutput();
+                }}
+              >
+                {searchedRows.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.id} - {entry.title}
+                  </option>
+                ))}
+              </Select>
+              {aiEntry ? (
+                <div className="sketch-note p-4">
+                  <p className="font-bold text-[var(--ink)]">{aiEntry.title}</p>
+                  <p className="mt-1 text-sm text-[var(--graphite)]">{aiEntry.participantName} · {aiEntry.id}</p>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="sketch-note p-4">
+              <p className="font-bold text-[var(--ink)]">{language === "ar" ? "بنود الفحص" : "Screening questions"}</p>
+              <div className="mt-3 space-y-3">
+                {aiQuestionKeys.map((key) => (
+                  <label key={key} className="flex items-center justify-between gap-3 rounded-2xl bg-[var(--paper)] px-3 py-2 text-sm font-bold">
+                    <span>{aiQuestionLabel(key, language)}</span>
+                    <input
+                      type="checkbox"
+                      checked={aiChecks[key]}
+                      disabled={aiScanning}
+                      onChange={(event) => {
+                        setAiChecks((current) => ({ ...current, [key]: event.target.checked }));
+                        resetAiScanOutput();
+                      }}
+                      className="h-4 w-4 accent-[var(--accent-green)]"
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-[var(--graphite)]">
+              {language === "ar" ? "الفحص هنا تجريبي لعرض الفلو فقط، وبعد التطبيق يتم تحديث حالة الفرز." : "This is a demo AI check for the flow; applying updates the filtering state."}
+            </p>
+            <Button disabled={!aiEntry || aiScanning} onClick={runAiScreening}>
+              <Bot className="h-4 w-4" />
+              {aiScanning
+                ? language === "ar"
+                  ? `جاري الفحص ${aiScanCountdown}`
+                  : `Scanning ${aiScanCountdown}`
+                : language === "ar"
+                  ? "فحص"
+                  : "Run check"}
+            </Button>
+          </div>
+
+          {aiScanning ? (
+            <div className="sketch-note p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="font-bold text-[var(--ink)]">{language === "ar" ? "الذكاء الصناعي يفحص العمل الآن" : "AI is screening this entry"}</p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--graphite)]">
+                    {language === "ar" ? "مقارنة التشابه، اللغة، الصورة، واكتمال المحتوى..." : "Checking similarity, language, image safety, and content completeness..."}
+                  </p>
+                </div>
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--accent-green)] text-2xl font-black text-white">
+                  {aiScanCountdown}
+                </div>
+              </div>
+              <Progress value={(3 - aiScanCountdown) * 34} className="mt-4" />
+            </div>
+          ) : null}
+
+          {aiFindings ? (
+            <div className="space-y-4">
+              {aiResultCount ? (
+                <div className="sketch-note p-4">
+                  <p className="font-bold text-[var(--ink)]">
+                    {language === "ar" ? `ظهرت ${aiResultCount} نتائج من فحص الذكاء الصناعي` : `${aiResultCount} AI screening results appeared`}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--graphite)]">
+                    {language === "ar" ? "النتائج دي متجمعة تحت البنود المختارة، وتقدر بعدها تختار إرجاع أو إخفاء." : "These results are grouped under the selected checks, then you can return or hide the entry."}
+                  </p>
+                </div>
+              ) : null}
+              <div className="grid gap-3 md:grid-cols-2">
+                {aiQuestionKeys.map((key) => {
+                  const found = aiFindings[key];
+                  return (
+                    <div key={key} className={`sketch-note p-4 ${found ? "ring-2 ring-[var(--accent-red)]" : ""}`}>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-bold text-[var(--ink)]">{aiQuestionLabel(key, language)}</p>
+                        <Badge tone={found ? "danger" : "success"}>
+                          {found ? (language === "ar" ? "تم الرصد" : "Found") : language === "ar" ? "سليم" : "Clear"}
+                        </Badge>
+                      </div>
+                      {found ? (
+                        <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-[var(--accent-red)]">
+                          <AlertTriangle className="h-4 w-4" />
+                          {aiFindingLabel(key, language)}
+                        </p>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-[1fr_260px] md:items-center">
+                <div className="sketch-note p-4">
+                  <p className="font-bold text-[var(--ink)]">
+                    {aiFindingKeys.length
+                      ? language === "ar"
+                        ? `تم رصد ${aiFindingKeys.length} ملاحظة تحتاج قرار`
+                        : `${aiFindingKeys.length} issue(s) need a decision`
+                      : language === "ar"
+                        ? "لم يتم رصد مشاكل في البنود المختارة"
+                        : "No issues found in selected checks"}
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--graphite)]">
+                    {language === "ar" ? "اختر الإجراء المناسب، أو أغلق النافذة بدون تطبيق." : "Choose an action, or close without applying."}
+                  </p>
+                </div>
+                <Select value={aiAction} onChange={(event) => setAiAction(event.target.value as AiScreenAction)}>
+                  <option value="return">{language === "ar" ? "إرجاع للمراجعة" : "Return for review"}</option>
+                  <option value="hide">{language === "ar" ? "إخفاء / استبعاد" : "Hide / disqualify"}</option>
+                  <option value="none">{language === "ar" ? "بدون إجراء الآن" : "No action now"}</option>
+                </Select>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </Dialog>
       <Dialog
         open={Boolean(selected)}
         onOpenChange={() => setSelected(null)}
@@ -1080,4 +1475,64 @@ function filteringLabel(key: keyof FilteringChecklist, language: "ar" | "en") {
     rulesCompliance: { ar: "الالتزام بالشروط العامة وشروط المسار", en: "General and track-condition compliance" }
   };
   return labels[key][language];
+}
+
+function aiQuestionLabel(key: AiScreenQuestion, language: "ar" | "en") {
+  const labels: Record<AiScreenQuestion, { ar: string; en: string }> = {
+    similarDesigns: { ar: "تصاميم متشابهة", en: "Similar designs" },
+    badWords: { ar: "ألفاظ خارجة", en: "Profanity" },
+    inappropriateImage: { ar: "صورة غير مناسبة", en: "Inappropriate image" },
+    emptyContent: { ar: "محتوى فارغ أو ناقص", en: "Empty or incomplete content" }
+  };
+  return labels[key][language];
+}
+
+function aiFindingLabel(key: AiScreenQuestion, language: "ar" | "en") {
+  const labels: Record<AiScreenQuestion, { ar: string; en: string }> = {
+    similarDesigns: { ar: "تشابه محتمل مع عمل آخر", en: "Possible similarity with another entry" },
+    badWords: { ar: "تم رصد لفظ يحتاج مراجعة", en: "A phrase needs review" },
+    inappropriateImage: { ar: "تم رصد عنصر بصري غير مناسب", en: "A visual element needs review" },
+    emptyContent: { ar: "المحتوى يبدو غير مكتمل", en: "Content appears incomplete" }
+  };
+  return labels[key][language];
+}
+
+function mockAiScreen(entry: Entry, enabled: Record<AiScreenQuestion, boolean>): Record<AiScreenQuestion, boolean> {
+  const serial = Number(entry.id.slice(-3));
+  return {
+    similarDesigns: enabled.similarDesigns && serial % 4 === 1,
+    badWords: enabled.badWords && serial % 7 === 0,
+    inappropriateImage: enabled.inappropriateImage && (entry.trackId === "drawing" || entry.trackId === "photography") && serial % 5 === 0,
+    emptyContent: enabled.emptyContent && (serial % 11 === 0 || entry.title.trim().length < 8)
+  };
+}
+
+function mockAiFindingCounts(entry: Entry, enabled: Record<AiScreenQuestion, boolean>, resultCount: number): Record<AiScreenQuestion, number> {
+  const findings = mockAiScreen(entry, enabled);
+  const foundKeys = aiQuestionKeys.filter((key) => findings[key]);
+  const counts: Record<AiScreenQuestion, number> = {
+    similarDesigns: 0,
+    badWords: 0,
+    inappropriateImage: 0,
+    emptyContent: 0
+  };
+
+  if (foundKeys.length === 0) {
+    return counts;
+  }
+
+  const baseCount = Math.floor(resultCount / foundKeys.length);
+  let remaining = resultCount;
+  foundKeys.forEach((key, index) => {
+    const count = index === foundKeys.length - 1 ? remaining : baseCount;
+    counts[key] = count;
+    remaining -= count;
+  });
+
+  return counts;
+}
+
+function mockAiResultCount(entry: Entry) {
+  const serial = Number(entry.id.slice(-3));
+  return serial % 2 === 0 ? 7 : 5;
 }
