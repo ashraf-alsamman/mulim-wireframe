@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Download, FileJson, List, Printer, Sparkles, Trophy, Upload } from "lucide-react";
+import { BarChart3, Download, FileJson, List, Scale, Sparkles, Trophy, Upload, Users } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
 import { TimelineStrip } from "@/components/timeline-view";
@@ -328,76 +328,91 @@ export function TimelinePageView() {
   );
 }
 
-type ReportKey = "progress" | "workload" | "scores" | "rankings" | "ties" | "approvals" | "winners";
-
 export function ReportsView() {
   const language = useDemoStore((state) => state.language);
-  const entries = useDemoStore((state) => state.entries);
-  const evaluators = useDemoStore((state) => state.evaluators);
-  const evaluations = useDemoStore((state) => state.evaluations);
-  const committees = useDemoStore((state) => state.committees);
-  const tieCases = useDemoStore((state) => state.tieCases);
-  const approvalHistory = useDemoStore((state) => state.approvalHistory);
-  const [report, setReport] = useState<ReportKey>("rankings");
-  const rows = reportRows(report, { entries, evaluators, evaluations, committees, tieCases, approvalHistory });
-
-  function exportCsv() {
-    const csv = toCsv(rows);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${report}-report.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  }
+  const reportCards = [
+    {
+      key: "winners-by-type",
+      title: language === "ar" ? "تقرير الفائزين حسب النوع" : "Winners by type report",
+      description:
+        language === "ar"
+          ? "عرض الفائزين مقسمين حسب المسار والفئة مثل الرسم - المدارس والرسم - الجامعات."
+          : "Winners grouped by track and category, such as Drawing - Schools and Drawing - Universities.",
+      icon: Trophy
+    },
+    {
+      key: "tie-cases",
+      title: language === "ar" ? "تقرير حالات التعادل" : "Tie cases report",
+      description:
+        language === "ar"
+          ? "ملخص لحالات التعادل، الأطراف المتعادلة، وحالة التصويت أو الحسم."
+          : "Summary of tie cases, tied entries, and voting or resolution status.",
+      icon: Scale
+    },
+    {
+      key: "evaluation-progress",
+      title: language === "ar" ? "تقرير تقدم التقييم" : "Evaluation progress report",
+      description:
+        language === "ar"
+          ? "متابعة اكتمال مراحل الفرز، التقييم الأولي، والتقييم النهائي."
+          : "Progress across filtering, initial evaluation, and final evaluation stages.",
+      icon: BarChart3
+    },
+    {
+      key: "evaluator-workload",
+      title: language === "ar" ? "تقرير المحكمين والتحميل عليهم" : "Evaluator workload report",
+      description:
+        language === "ar"
+          ? "نظرة على المحكمين، المسارات المسندة لهم، وحجم الأعمال المطلوبة منهم."
+          : "Overview of evaluators, assigned tracks, and their expected workload.",
+      icon: Users
+    }
+  ];
 
   return (
     <div className="space-y-5">
-      <Card>
-        <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <Select value={report} onChange={(event) => setReport(event.target.value as ReportKey)} className="md:w-72">
-            <option value="progress">{language === "ar" ? "تقدم المحكمين" : "Evaluator progress"}</option>
-            <option value="workload">{language === "ar" ? "عبء المحكمين" : "Evaluator workload"}</option>
-            <option value="scores">{language === "ar" ? "درجات الأعمال" : "Entry scores"}</option>
-            <option value="rankings">{language === "ar" ? "الترتيب النهائي" : "Final rankings"}</option>
-            <option value="ties">{language === "ar" ? "قرارات التعادل" : "Tie-breaking decisions"}</option>
-            <option value="approvals">{language === "ar" ? "سجل الاعتماد" : "Approval history"}</option>
-            <option value="winners">{language === "ar" ? "قائمة الفائزين" : "Winners list"}</option>
-          </Select>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={exportCsv}>
-              <Download className="h-4 w-4" />
-              {t(language, "csv")}
-            </Button>
-            <Button variant="secondary" onClick={() => window.print()}>
-              <Printer className="h-4 w-4" />
-              {t(language, "print")}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-      <div className="sketch-table overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y-2 divide-dashed divide-[var(--muted-line)] text-sm">
-            <thead className="bg-[var(--paper-soft)] text-[var(--ink-soft)]">
-              <tr>
-                {Object.keys(rows[0] ?? { empty: "" }).map((key) => (
-                  <th key={key} className="px-4 py-3 text-start font-bold">{key}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-dashed divide-[rgba(0,0,0,0.24)]">
-              {rows.map((row, index) => (
-                <tr key={index}>
-                  {Object.values(row).map((value, cell) => (
-                    <td key={cell} className="px-4 py-3 text-[var(--ink-soft)]">{String(value)}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="sketch-card flex flex-col gap-3 p-5 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-[var(--graphite)]">
+            {language === "ar" ? "مركز التقارير" : "Reports center"}
+          </p>
+          <h2 className="mt-1 text-2xl font-bold text-[var(--ink)]">
+            {language === "ar" ? "اختر نوع التقرير المطلوب" : "Choose a report type"}
+          </h2>
         </div>
+        <Badge tone="neutral">{language === "ar" ? "واجهة فقط" : "UI only"}</Badge>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        {reportCards.map((report) => {
+          const Icon = report.icon;
+
+          return (
+            <Card key={report.key} className="min-h-56">
+              <CardContent className="flex h-full flex-col justify-between gap-6 p-6">
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <Icon className="h-10 w-10 shrink-0 text-[var(--ink)]" />
+                    <Badge tone="neutral">{language === "ar" ? "تقرير" : "Report"}</Badge>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-[var(--ink)]">{report.title}</h3>
+                    <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--graphite)]">{report.description}</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t-2 border-dashed border-[var(--muted-line)] pt-4">
+                  <span className="text-xs font-bold text-[var(--ink-soft)]">
+                    {language === "ar" ? "زر التصدير موجود بدون تنفيذ حالياً" : "Export button is visual only for now"}
+                  </span>
+                  <Button type="button" variant="secondary">
+                    <Download className="h-4 w-4" />
+                    {language === "ar" ? "تصدير" : "Export"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
@@ -508,77 +523,4 @@ export function SettingsView() {
       </Card>
     </div>
   );
-}
-
-function reportRows(
-  report: ReportKey,
-  data: {
-    entries: Entry[];
-    evaluators: ReturnType<typeof useDemoStore.getState>["evaluators"];
-    evaluations: ReturnType<typeof useDemoStore.getState>["evaluations"];
-    committees: ReturnType<typeof useDemoStore.getState>["committees"];
-    tieCases: ReturnType<typeof useDemoStore.getState>["tieCases"];
-    approvalHistory: ReturnType<typeof useDemoStore.getState>["approvalHistory"];
-  }
-): Array<Record<string, string | number>> {
-  if (report === "progress") {
-    return data.evaluators.map((evaluator) => ({
-      evaluator: evaluator.fullName,
-      submitted: data.evaluations.filter((evaluation) => evaluation.evaluatorId === evaluator.id && evaluation.status === "submitted").length,
-      drafts: data.evaluations.filter((evaluation) => evaluation.evaluatorId === evaluator.id && evaluation.status === "draft").length
-    }));
-  }
-  if (report === "workload") {
-    return data.evaluators.map((evaluator) => ({
-      evaluator: evaluator.fullName,
-      assignedEntries: data.entries.filter((entry) => entry.assignedEvaluatorIds.includes(evaluator.id)).length,
-      tracks: evaluator.assignedTrackIds.join(", ")
-    }));
-  }
-  if (report === "scores") {
-    return data.entries.map((entry) => ({
-      id: entry.id,
-      participant: entry.participantName,
-      initialScore: entry.totalScore,
-      finalScore: entry.finalScore,
-      status: entry.finalistStatus
-    }));
-  }
-  if (report === "ties") {
-    return data.tieCases.map((tieCase) => ({
-      id: tieCase.id,
-      entries: tieCase.entryIds.join(", "),
-      status: tieCase.status,
-      votes: tieCase.votes.length,
-      manualWinner: tieCase.manualWinnerId ?? ""
-    }));
-  }
-  if (report === "approvals") {
-    return data.approvalHistory.map((item) => ({
-      user: item.user,
-      action: item.action,
-      date: item.date,
-      comments: item.comments
-    }));
-  }
-  const ranked = rankEntries(data.entries.filter((entry) => entry.finalScore > 0), data.tieCases);
-  return ranked.map((entry) => ({
-    rank: entry.rank,
-    id: entry.id,
-    participant: entry.participantName,
-    country: entry.participantCountry,
-    title: entry.title,
-    finalScore: entry.finalScore,
-    awarenessScore: entry.awarenessScore,
-    status: entry.finalistStatus
-  }));
-}
-
-function toCsv(rows: Array<Record<string, string | number>>): string {
-  if (!rows.length) {
-    return "";
-  }
-  const headers = Object.keys(rows[0]);
-  const lines = rows.map((row) => headers.map((header) => `"${String(row[header] ?? "").replaceAll("\"", "\"\"")}"`).join(","));
-  return [headers.join(","), ...lines].join("\n");
 }
