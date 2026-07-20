@@ -208,7 +208,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         {sidebarOpen ? (
           <div className="fixed inset-0 z-40 lg:hidden">
-            <button className="absolute inset-0 bg-[rgba(15,23,42,0.34)]" aria-label="Close menu" onClick={() => setSidebarOpen(false)} />
+            <button className="absolute inset-0 bg-[rgba(0,0,0,0.34)]" aria-label="Close menu" onClick={() => setSidebarOpen(false)} />
             <div className="relative h-full w-[min(86vw,310px)] bg-[var(--paper)] p-4">{sidebar}</div>
           </div>
         ) : null}

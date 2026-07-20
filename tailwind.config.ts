@@ -6,26 +6,26 @@ const config: Config = {
     extend: {
       colors: {
         navy: {
-          50: "#eef5ff",
-          100: "#d8e8ff",
-          500: "#2868a8",
-          700: "#173d69",
-          900: "#0b1e34"
+          50: "#f5f5f5",
+          100: "#eeeeee",
+          500: "#707070",
+          700: "#242424",
+          900: "#000000"
         },
         burgundy: {
-          50: "#fff0f4",
-          500: "#9f2446",
-          700: "#741932"
+          50: "#f5f5f5",
+          500: "#4d4d4d",
+          700: "#000000"
         },
         gulf: {
-          green: "#1f7a53",
-          blue: "#56a6d6",
-          red: "#c84a4a",
-          gold: "#b88a2f"
+          green: "#000000",
+          blue: "#242424",
+          red: "#000000",
+          gold: "#4d4d4d"
         }
       },
       boxShadow: {
-        soft: "0 18px 50px rgba(11, 30, 52, 0.08)"
+        soft: "none"
       }
     }
   },

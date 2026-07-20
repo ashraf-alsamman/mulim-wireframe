@@ -204,7 +204,7 @@ export function FilteringView() {
   }
 
   function aiFilterBadgeClass(filter: AiFindingFilter) {
-    return filter === "all" ? "bg-[var(--accent-green)]" : "bg-red-600";
+    return filter === "all" ? "bg-[var(--ink)]" : "bg-[var(--ink-soft)]";
   }
 
   function buildAiScreeningBatch(seedEntry: Entry, resultCount: number) {
@@ -360,7 +360,7 @@ export function FilteringView() {
               {aiFilterOpen ? (
                 <div
                   role="listbox"
-                  className="absolute right-0 z-30 mt-2 w-full overflow-hidden rounded-[18px] border border-[var(--line)] bg-white p-1 shadow-[0_18px_40px_rgba(15,23,42,0.16)]"
+                  className="absolute right-0 z-30 mt-2 w-full overflow-hidden rounded-[18px] border border-[var(--line)] bg-white p-1 shadow-[0_18px_40px_rgba(0,0,0,0.16)]"
                 >
                   {aiFilterOptions.map((option) => (
                     <button
@@ -369,7 +369,7 @@ export function FilteringView() {
                       role="option"
                       aria-selected={option.value === aiFindingFilter}
                       className={`flex w-full items-center gap-2 rounded-[14px] px-3 py-2 text-sm font-semibold transition ${
-                        option.value === aiFindingFilter ? "bg-[#e3f1f0] text-[var(--accent-green)]" : "text-[var(--ink)] hover:bg-[var(--paper)]"
+                        option.value === aiFindingFilter ? "bg-[var(--paper-warm)] text-[var(--ink)]" : "text-[var(--ink)] hover:bg-[var(--paper)]"
                       }`}
                       onClick={() => {
                         setAiFindingFilter(option.value);

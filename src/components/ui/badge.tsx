@@ -5,7 +5,7 @@ import { cn } from "@/utils/cn";
 type BadgeTone = "neutral" | "success" | "warning" | "danger" | "info" | "burgundy";
 
 const tones: Record<BadgeTone, string> = {
-  neutral: "text-[var(--ink-soft)]",
+  neutral: "bg-[var(--paper-warm)] text-[var(--ink)]",
   success: "bg-[var(--ink)] text-[var(--paper-soft)]",
   warning: "bg-[var(--paper-soft)] text-[var(--ink)]",
   danger: "bg-[var(--ink)] text-[var(--paper-soft)]",
