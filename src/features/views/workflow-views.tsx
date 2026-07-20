@@ -1,7 +1,26 @@
 "use client";
 
-import { AlertTriangle, ArrowLeft, ArrowRight, Bot, Calculator, Check, ChevronDown, EyeOff, RotateCcw, Save, Search, Send, ThumbsUp } from "lucide-react";
-import type { ReactNode } from "react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  Bot,
+  Calculator,
+  Check,
+  ChevronDown,
+  EyeOff,
+  FileText,
+  ImageIcon,
+  Play,
+  RotateCcw,
+  Save,
+  Search,
+  Send,
+  ThumbsUp,
+  Video,
+  ZoomIn
+} from "lucide-react";
+import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ScoreInput } from "@/components/score-input";
@@ -36,6 +55,11 @@ function initialPassThreshold(maxScore: number) {
 type AiScreenQuestion = "similarDesigns" | "badWords" | "inappropriateImage" | "emptyContent";
 type AiScreenAction = "none" | "return" | "hide";
 type AiFindingFilter = "all" | "flagged" | AiScreenQuestion;
+type PreviewOrigin = {
+  x: number;
+  y: number;
+  scale: number;
+};
 
 const aiQuestionKeys: AiScreenQuestion[] = ["similarDesigns", "badWords", "inappropriateImage", "emptyContent"];
 const defaultAiScreenChecks: Record<AiScreenQuestion, boolean> = {
@@ -66,6 +90,8 @@ export function FilteringView() {
   const [aiScanning, setAiScanning] = useState(false);
   const [aiScanCountdown, setAiScanCountdown] = useState(3);
   const [aiResultCount, setAiResultCount] = useState<number | null>(null);
+  const [previewEntry, setPreviewEntry] = useState<Entry | null>(null);
+  const [previewOrigin, setPreviewOrigin] = useState<PreviewOrigin | null>(null);
   const aiFilterRef = useRef<HTMLDivElement | null>(null);
   const aiScanTimerRef = useRef<number | null>(null);
   const aiScanIntervalRef = useRef<number | null>(null);
@@ -136,6 +162,21 @@ export function FilteringView() {
       key: "relevance",
       header: language === "ar" ? "الصلة" : "Relevance",
       cell: (row) => <StatusBadge group="checklist" value={row.filteringChecklist.relevance} language={language} />
+    },
+    {
+      key: "preview",
+      header: language === "ar" ? "المعاينة" : "Preview",
+      className: "w-28",
+      cell: (row) => (
+        <EntryPreviewThumbnail
+          entry={row}
+          language={language}
+          onOpen={(origin) => {
+            setPreviewOrigin(origin);
+            setPreviewEntry(row);
+          }}
+        />
+      )
     },
     {
       key: "ip",
@@ -392,6 +433,20 @@ export function FilteringView() {
       </div>
       <DataTable rows={rows} columns={columns} />
       <Dialog
+        open={Boolean(previewEntry)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPreviewEntry(null);
+            setPreviewOrigin(null);
+          }
+        }}
+        title={previewEntry ? `${previewEntry.id} · ${previewEntry.title}` : ""}
+        className="preview-dialog w-[min(96vw,980px)]"
+        contentStyle={previewDialogStyle(previewOrigin)}
+      >
+        {previewEntry ? <EntryPreviewModal entry={previewEntry} language={language} /> : null}
+      </Dialog>
+      <Dialog
         open={aiOpen}
         onOpenChange={(open) => {
           if (!open) {
@@ -584,6 +639,281 @@ export function FilteringView() {
   );
 }
 
+type PreviewKind = "image" | "video" | "document";
+
+type EntryPreviewAsset = {
+  kind: PreviewKind;
+  label: string;
+  thumbnailUrl: string;
+  previewUrl: string;
+  posterUrl?: string;
+};
+
+function EntryPreviewThumbnail({
+  entry,
+  language,
+  onOpen
+}: {
+  entry: Entry;
+  language: "ar" | "en";
+  onOpen: (origin: PreviewOrigin) => void;
+}) {
+  const asset = entryPreviewAsset(entry);
+  const Icon = previewIcon(asset.kind);
+  function openFromThumbnail(element: HTMLButtonElement) {
+    onOpen(previewOriginFromElement(element));
+  }
+
+  return (
+    <button
+      type="button"
+      className="group relative h-14 w-20 overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--paper-warm)] p-0 text-start transition hover:border-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--ink)]"
+      aria-label={language === "ar" ? `معاينة ${entry.title}` : `Preview ${entry.title}`}
+      onFocus={(event) => openFromThumbnail(event.currentTarget)}
+      onMouseEnter={(event) => openFromThumbnail(event.currentTarget)}
+      onClick={(event) => openFromThumbnail(event.currentTarget)}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={asset.thumbnailUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+      <span className="absolute inset-0 bg-[rgba(0,0,0,0.08)] opacity-0 transition group-hover:opacity-100" />
+      <span className="absolute bottom-1 start-1 grid h-5 w-5 place-items-center rounded bg-[var(--paper-soft)] text-[var(--ink)]">
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      <span className="absolute end-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-[var(--paper-soft)] text-[var(--ink)] opacity-0 transition group-hover:opacity-100">
+        <ZoomIn className="h-3.5 w-3.5" />
+      </span>
+      {asset.kind === "video" ? (
+        <span className="absolute inset-0 grid place-items-center">
+          <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--paper-soft)] text-[var(--ink)]">
+            <Play className="h-3.5 w-3.5 fill-current" />
+          </span>
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function previewOriginFromElement(element: HTMLElement): PreviewOrigin {
+  const rect = element.getBoundingClientRect();
+  const dialogWidth = Math.min(window.innerWidth * 0.96, 980);
+  const dialogHeight = Math.min(window.innerHeight * 0.88, 720);
+  const widthScale = rect.width / dialogWidth;
+  const heightScale = rect.height / dialogHeight;
+
+  return {
+    x: rect.left + rect.width / 2 - window.innerWidth / 2,
+    y: rect.top + rect.height / 2 - window.innerHeight / 2,
+    scale: Math.max(0.08, Math.min(0.28, widthScale, heightScale))
+  };
+}
+
+function previewDialogStyle(origin: PreviewOrigin | null): CSSProperties {
+  return {
+    "--preview-start-x": `${origin?.x ?? 0}px`,
+    "--preview-start-y": `${origin?.y ?? 0}px`,
+    "--preview-start-scale": `${origin?.scale ?? 0.12}`
+  } as CSSProperties;
+}
+
+function EntryLargePreview({
+  entry,
+  language,
+  blindReview = false,
+  onOpen
+}: {
+  entry: Entry;
+  language: "ar" | "en";
+  blindReview?: boolean;
+  onOpen: (origin: PreviewOrigin) => void;
+}) {
+  const asset = entryPreviewAsset(entry);
+  const Icon = previewIcon(asset.kind);
+  const previewRef = useRef<HTMLDivElement | null>(null);
+
+  function openFromFrame() {
+    if (previewRef.current) {
+      onOpen(previewOriginFromElement(previewRef.current));
+    }
+  }
+
+  return (
+    <Card className="overflow-hidden xl:min-h-[72vh]">
+      <CardHeader className="flex flex-row items-center justify-between gap-3 p-4">
+        <div className="min-w-0">
+          <CardTitle>{language === "ar" ? "معاينة العمل" : "Artwork preview"}</CardTitle>
+          <p className="mt-1 truncate text-sm text-[var(--graphite)]">
+            {entryReviewerMeta(entry, language, blindReview)} · {asset.label}
+          </p>
+        </div>
+        <Button
+          variant="secondary"
+          size="icon"
+          aria-label={language === "ar" ? "فتح المعاينة الكبيرة" : "Open large preview"}
+          onClick={openFromFrame}
+        >
+          <ZoomIn className="h-4 w-4" />
+        </Button>
+      </CardHeader>
+      <CardContent className="flex min-h-[58vh] flex-col gap-3 p-4">
+        <div
+          ref={previewRef}
+          className="relative flex min-h-[50vh] flex-1 items-center justify-center overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--ink)]"
+        >
+          {asset.kind === "video" ? (
+            <video
+              className="h-full max-h-[64vh] w-full object-contain"
+              src={asset.previewUrl}
+              poster={asset.posterUrl}
+              controls
+              preload="metadata"
+            />
+          ) : (
+            <button type="button" className="flex h-full w-full items-center justify-center" onClick={openFromFrame}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={asset.previewUrl} alt={entry.title} className="h-full max-h-[64vh] w-full object-contain" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--line)] bg-[var(--paper)] p-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-[var(--line)] bg-[var(--paper-warm)] text-[var(--ink)]">
+              <Icon className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate font-bold text-[var(--ink)]">{entry.title}</p>
+              <p className="mt-1 text-sm text-[var(--graphite)]">{entry.id}</p>
+            </div>
+          </div>
+          <Badge tone="neutral">{mediaKindLabel(asset.kind, language)}</Badge>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function EntryPreviewModal({ entry, language, blindReview = false }: { entry: Entry; language: "ar" | "en"; blindReview?: boolean }) {
+  const asset = entryPreviewAsset(entry);
+  const Icon = previewIcon(asset.kind);
+
+  return (
+    <div className="space-y-4">
+      <div className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--ink)]">
+        {asset.kind === "video" ? (
+          <video className="max-h-[62vh] w-full bg-[var(--ink)]" src={asset.previewUrl} poster={asset.posterUrl} controls preload="metadata" />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={asset.previewUrl} alt={entry.title} className="max-h-[62vh] w-full object-contain" />
+        )}
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-[auto_1fr_auto] md:items-center">
+        <div className="grid h-11 w-11 place-items-center rounded-lg border border-[var(--line)] bg-[var(--paper-warm)] text-[var(--ink)]">
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <p className="truncate font-bold text-[var(--ink)]">{entry.title}</p>
+          <p className="mt-1 text-sm text-[var(--graphite)]">
+            {entryReviewerMeta(entry, language, blindReview)} · {asset.label}
+          </p>
+        </div>
+        <Badge tone="neutral">{mediaKindLabel(asset.kind, language)}</Badge>
+      </div>
+    </div>
+  );
+}
+
+function entryPreviewAsset(entry: Entry): EntryPreviewAsset {
+  const seed = encodeURIComponent(entry.id);
+
+  if (entry.trackId === "video") {
+    const videoUrls = [
+      "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+      "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.webm"
+    ];
+    const posterUrl = `https://picsum.photos/seed/${seed}-video/640/360`;
+    return {
+      kind: "video",
+      label: "MP4",
+      thumbnailUrl: posterUrl,
+      previewUrl: videoUrls[Number(entry.id.slice(-1)) % videoUrls.length],
+      posterUrl
+    };
+  }
+
+  if (entry.trackId === "writing") {
+    return {
+      kind: "document",
+      label: "PDF",
+      thumbnailUrl: documentPreviewSvg(entry, "thumb"),
+      previewUrl: documentPreviewSvg(entry, "large")
+    };
+  }
+
+  return {
+    kind: "image",
+    label: entry.trackId === "photography" ? "JPG" : "PNG",
+    thumbnailUrl: `https://picsum.photos/seed/${seed}-${entry.trackId}/240/150`,
+    previewUrl: `https://picsum.photos/seed/${seed}-${entry.trackId}/1200/760`
+  };
+}
+
+function documentPreviewSvg(entry: Entry, size: "thumb" | "large") {
+  const width = size === "thumb" ? 240 : 900;
+  const height = size === "thumb" ? 150 : 1160;
+  const titleSize = size === "thumb" ? 18 : 42;
+  const idSize = size === "thumb" ? 13 : 28;
+  const lines = size === "thumb" ? 5 : 12;
+  const lineGap = size === "thumb" ? 14 : 56;
+  const lineStart = size === "thumb" ? 62 : 220;
+  const svgLines = Array.from({ length: lines }, (_, index) => {
+    const y = lineStart + index * lineGap;
+    const lineWidth = width - (index % 3 === 0 ? 92 : index % 3 === 1 ? 64 : 130);
+    return `<rect x="30" y="${y}" width="${lineWidth}" height="${size === "thumb" ? 5 : 18}" rx="3" fill="#d8d8d8"/>`;
+  }).join("");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+<rect width="100%" height="100%" fill="#f7f7f7"/>
+<rect x="${size === "thumb" ? 14 : 42}" y="${size === "thumb" ? 10 : 36}" width="${width - (size === "thumb" ? 28 : 84)}" height="${height - (size === "thumb" ? 20 : 72)}" rx="${size === "thumb" ? 10 : 26}" fill="#ffffff" stroke="#111111" stroke-width="${size === "thumb" ? 2 : 4}"/>
+<text x="30" y="${size === "thumb" ? 38 : 120}" font-family="Arial, sans-serif" font-size="${titleSize}" font-weight="700" fill="#000000">Document</text>
+<text x="30" y="${size === "thumb" ? 54 : 168}" font-family="Arial, sans-serif" font-size="${idSize}" fill="#777777">${entry.id}</text>
+${svgLines}
+<rect x="30" y="${height - (size === "thumb" ? 34 : 118)}" width="${size === "thumb" ? 66 : 210}" height="${size === "thumb" ? 18 : 54}" rx="${size === "thumb" ? 9 : 27}" fill="#000000"/>
+<text x="${size === "thumb" ? 50 : 112}" y="${height - (size === "thumb" ? 21 : 82)}" font-family="Arial, sans-serif" font-size="${size === "thumb" ? 10 : 24}" font-weight="700" fill="#ffffff">PDF</text>
+</svg>`;
+
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+function previewIcon(kind: PreviewKind) {
+  if (kind === "video") {
+    return Video;
+  }
+  if (kind === "document") {
+    return FileText;
+  }
+  return ImageIcon;
+}
+
+function mediaKindLabel(kind: PreviewKind, language: "ar" | "en") {
+  if (kind === "video") {
+    return language === "ar" ? "فيديو" : "Video";
+  }
+  if (kind === "document") {
+    return language === "ar" ? "مستند" : "Document";
+  }
+  return language === "ar" ? "صورة" : "Photo";
+}
+
+function entryReviewerMeta(entry: Entry, language: "ar" | "en", blindReview = false) {
+  if (blindReview) {
+    return language === "ar"
+      ? `${entry.id} · ${entry.trackId} · صاحب العمل مخفي`
+      : `${entry.id} · ${entry.trackId} · Artist hidden`;
+  }
+
+  return `${entry.id} · ${entry.participantName} · ${entry.trackId}`;
+}
+
 export function InitialEvaluationView() {
   const language = useDemoStore((state) => state.language);
   const role = useDemoStore((state) => state.role);
@@ -673,11 +1003,19 @@ export function InitialEvaluationView() {
               setEvaluationOpen(true);
             }}
             maxScore={maxScore}
+            showPreview
+            blindReview
           />
         </CardContent>
       </Card>
 
-      <Dialog open={evaluationOpen} onOpenChange={setEvaluationOpen} title={t(language, "initialEvaluation")} className="w-[min(96vw,1180px)]">
+      <Dialog
+        open={evaluationOpen}
+        onOpenChange={setEvaluationOpen}
+        title={t(language, "initialEvaluation")}
+        className="max-h-[96vh] w-[calc(100vw-24px)]"
+        bodyClassName="p-3"
+      >
         <EvaluationPanel
           language={language}
           title={language === "ar" ? "تقييم العمل المختار" : "Evaluate selected entry"}
@@ -708,6 +1046,8 @@ export function InitialEvaluationView() {
           }}
           previousDisabled={entryIndex <= 0}
           nextDisabled={entryIndex >= eligibleEntries.length - 1}
+          showMediaReview
+          blindReview
         />
       </Dialog>
     </div>
@@ -900,7 +1240,9 @@ function EntrySelectionList({
   selectedEntryId,
   onSelect,
   maxScore,
-  showInitialScore = false
+  showInitialScore = false,
+  showPreview = false,
+  blindReview = false
 }: {
   language: "ar" | "en";
   label: string;
@@ -909,10 +1251,14 @@ function EntrySelectionList({
   onSelect: (entryId: string) => void;
   maxScore: number;
   showInitialScore?: boolean;
+  showPreview?: boolean;
+  blindReview?: boolean;
 }) {
   const pageSize = 12;
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [previewEntry, setPreviewEntry] = useState<Entry | null>(null);
+  const [previewOrigin, setPreviewOrigin] = useState<PreviewOrigin | null>(null);
   const normalizedQuery = query.trim().toLowerCase();
   const filteredEntries = useMemo(() => {
     if (!normalizedQuery) {
@@ -920,10 +1266,12 @@ function EntrySelectionList({
     }
 
     return entries.filter((entry) => {
-      const searchable = `${entry.id} ${entry.title} ${entry.participantName} ${entry.trackId}`.toLowerCase();
+      const searchable = blindReview
+        ? `${entry.id} ${entry.title} ${entry.trackId}`.toLowerCase()
+        : `${entry.id} ${entry.title} ${entry.participantName} ${entry.trackId}`.toLowerCase();
       return searchable.includes(normalizedQuery);
     });
-  }, [entries, normalizedQuery]);
+  }, [blindReview, entries, normalizedQuery]);
   const pageCount = Math.max(1, Math.ceil(filteredEntries.length / pageSize));
   const start = (page - 1) * pageSize;
   const visibleEntries = filteredEntries.slice(start, start + pageSize);
@@ -951,7 +1299,15 @@ function EntrySelectionList({
               id="entry-list-search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder={language === "ar" ? "ابحث بالكود أو العنوان أو اسم المشارك" : "Search by code, title, or participant"}
+              placeholder={
+                blindReview
+                  ? language === "ar"
+                    ? "ابحث بالكود أو العنوان"
+                    : "Search by code or title"
+                  : language === "ar"
+                    ? "ابحث بالكود أو العنوان أو اسم المشارك"
+                    : "Search by code, title, or participant"
+              }
               className={language === "ar" ? "pr-10" : "pl-10"}
             />
           </div>
@@ -971,20 +1327,33 @@ function EntrySelectionList({
           visibleEntries.map((entry) => {
             const selected = entry.id === selectedEntryId;
             return (
-              <button
+              <div
                 key={entry.id}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => onSelect(entry.id)}
-                className={`sketch-note block w-full p-3 text-start transition ${
+                className={`sketch-note grid gap-3 p-3 transition sm:grid-cols-[auto_1fr] ${
                   selected ? "outline outline-2 outline-offset-2 outline-black" : "hover:-translate-y-0.5"
                 }`}
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
+                {showPreview ? (
+                  <EntryPreviewThumbnail
+                    entry={entry}
+                    language={language}
+                    onOpen={(origin) => {
+                      setPreviewOrigin(origin);
+                      setPreviewEntry(entry);
+                    }}
+                  />
+                ) : null}
+                <button
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => onSelect(entry.id)}
+                  className="min-w-0 rounded-lg text-start focus:outline-none focus:ring-2 focus:ring-[var(--ink)]"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-base font-bold text-navy-900">{entry.title}</p>
                     <p className="mt-1 text-xs text-slate-500">
-                      {entry.id} · {entry.participantName} · {entry.trackId}
+                      {entryReviewerMeta(entry, language, blindReview)}
                     </p>
                   </div>
                   <div className="flex flex-wrap justify-end gap-2 text-xs">
@@ -997,7 +1366,8 @@ function EntrySelectionList({
                     ) : null}
                   </div>
                 </div>
-              </button>
+                </button>
+              </div>
             );
           })
         ) : (
@@ -1006,6 +1376,21 @@ function EntrySelectionList({
           </div>
         )}
       </div>
+
+      <Dialog
+        open={Boolean(previewEntry)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPreviewEntry(null);
+            setPreviewOrigin(null);
+          }
+        }}
+        title={previewEntry ? `${previewEntry.id} · ${previewEntry.title}` : ""}
+        className="preview-dialog w-[min(96vw,980px)]"
+        contentStyle={previewDialogStyle(previewOrigin)}
+      >
+        {previewEntry ? <EntryPreviewModal entry={previewEntry} language={language} blindReview={blindReview} /> : null}
+      </Dialog>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-sm font-semibold text-[var(--ink-soft)]">
@@ -1397,7 +1782,9 @@ function EvaluationPanel({
   onNext,
   previousDisabled,
   nextDisabled,
-  extraAction
+  extraAction,
+  showMediaReview = false,
+  blindReview = false
 }: {
   language: "ar" | "en";
   title: string;
@@ -1419,19 +1806,144 @@ function EvaluationPanel({
   previousDisabled?: boolean;
   nextDisabled?: boolean;
   extraAction?: ReactNode;
+  showMediaReview?: boolean;
+  blindReview?: boolean;
 }) {
   const thresholdPercent = threshold === undefined || maxScore === 0 ? null : Math.round((threshold / maxScore) * 100);
+  const [previewEntry, setPreviewEntry] = useState<Entry | null>(null);
+  const [previewOrigin, setPreviewOrigin] = useState<PreviewOrigin | null>(null);
+
+  const openPreview = (origin: PreviewOrigin) => {
+    setPreviewOrigin(origin);
+    setPreviewEntry(entry);
+  };
+
+  const previewDialog = (
+    <Dialog
+      open={Boolean(previewEntry)}
+      onOpenChange={(open) => {
+        if (!open) {
+          setPreviewEntry(null);
+          setPreviewOrigin(null);
+        }
+      }}
+      title={previewEntry ? `${previewEntry.id} · ${previewEntry.title}` : ""}
+      className="preview-dialog w-[min(96vw,980px)]"
+      contentStyle={previewDialogStyle(previewOrigin)}
+    >
+      {previewEntry ? <EntryPreviewModal entry={previewEntry} language={language} blindReview={blindReview} /> : null}
+    </Dialog>
+  );
+
+  if (showMediaReview) {
+    return (
+      <>
+        <div className="grid gap-4 xl:grid-cols-[minmax(210px,1fr)_minmax(0,4fr)]">
+          <Card className="xl:min-h-[72vh]">
+            <CardHeader className="p-3">
+              <CardTitle className="text-sm">{title}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 p-3 xl:max-h-[calc(96vh-8rem)] xl:overflow-y-auto">
+              <div className="rounded-lg bg-navy-50 p-2.5">
+                <p className="text-xs font-semibold text-navy-700">{language === "ar" ? "المجموع" : "Total"}</p>
+                <p className="text-2xl font-bold text-navy-900">
+                  {total.toFixed(1)} / {maxScore}
+                </p>
+                {threshold !== undefined ? (
+                  <p className="mt-0.5 text-[11px] text-slate-600">
+                    {language === "ar" ? "حد التأهل" : "Qualification threshold"} {thresholdPercent}% ({threshold} / {maxScore})
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="space-y-2">
+                {criteria.map((criterion) => (
+                  <ScoreInput
+                    key={criterion.id}
+                    id={criterion.id}
+                    label={localized(language, criterion.name)}
+                    value={scores[criterion.id]}
+                    max={criterion.maxScore}
+                    disabled={!editable}
+                    onChange={onScore}
+                    compact
+                  />
+                ))}
+              </div>
+
+              <Textarea value={comments} disabled={!editable} onChange={(event) => onComments(event.target.value)} className="min-h-16 text-xs" />
+
+              <div className="grid gap-2">
+                <div className="flex flex-wrap gap-2">
+                  {extraAction}
+                  <Button variant="secondary" size="sm" disabled={!editable} onClick={onDraft}>
+                    <Save className="h-4 w-4" />
+                    {t(language, "draft")}
+                  </Button>
+                  <Button size="sm" disabled={!editable} onClick={onSubmit}>
+                    <Send className="h-4 w-4" />
+                    {t(language, "submitFinal")}
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {onPrevious ? (
+                    <Button variant="secondary" size="sm" disabled={previousDisabled} onClick={onPrevious}>
+                      {language === "ar" ? <ArrowRight className="h-4 w-4" /> : <ArrowLeft className="h-4 w-4" />}
+                      {t(language, "previousEntry")}
+                    </Button>
+                  ) : null}
+                  {onNext ? (
+                    <Button variant="secondary" size="sm" disabled={nextDisabled} onClick={onNext}>
+                      {t(language, "nextEntry")}
+                      {language === "ar" ? <ArrowLeft className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <EntryLargePreview entry={entry} language={language} blindReview={blindReview} onOpen={openPreview} />
+        </div>
+        {previewDialog}
+      </>
+    );
+  }
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[0.7fr_1.3fr]">
-      <Card>
+    <>
+      <div className="grid gap-5 xl:grid-cols-[0.7fr_1.3fr]">
+        <Card>
         <CardHeader>
           <CardTitle>{title}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <InfoLine label={t(language, "entries")} value={`${entry.id} · ${entry.title}`} />
-          <InfoLine label={t(language, "participant")} value={entry.participantName} />
+          <InfoLine
+            label={t(language, "participant")}
+            value={blindReview ? (language === "ar" ? "مخفي للمراجعة العادلة" : "Hidden for fair review") : entry.participantName}
+          />
           <InfoLine label={language === "ar" ? "المحكم" : "Evaluator"} value={evaluatorName} />
+          {showMediaReview ? (
+            <div className="sketch-note p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-bold text-[var(--ink)]">{language === "ar" ? "ملف العمل" : "Submission file"}</p>
+                  <p className="mt-1 text-xs text-[var(--graphite)]">
+                    {language === "ar" ? "مرر أو اضغط للمعاينة" : "Hover or click to preview"}
+                  </p>
+                </div>
+                <EntryPreviewThumbnail
+                  entry={entry}
+                  language={language}
+                  onOpen={(origin) => {
+                    setPreviewOrigin(origin);
+                    setPreviewEntry(entry);
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
           <div className="rounded-lg bg-navy-50 p-4">
             <p className="text-sm font-semibold text-navy-700">{language === "ar" ? "المجموع" : "Total"}</p>
             <p className="text-4xl font-bold text-navy-900">{total.toFixed(1)} / {maxScore}</p>
@@ -1456,8 +1968,8 @@ function EvaluationPanel({
             ) : null}
           </div>
         </CardContent>
-      </Card>
-      <Card>
+        </Card>
+        <Card>
         <CardContent className="space-y-4">
           {criteria.map((criterion) => (
             <ScoreInput
@@ -1483,16 +1995,18 @@ function EvaluationPanel({
             </Button>
           </div>
         </CardContent>
-      </Card>
-    </div>
+        </Card>
+      </div>
+      {previewDialog}
+    </>
   );
 }
 
-function InfoLine({ label, value }: { label: string; value: string }) {
+function InfoLine({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3 text-sm">
-      <span className="text-slate-500">{label}</span>
-      <strong className="text-navy-900">{value}</strong>
+    <div className={`flex items-center justify-between gap-3 ${compact ? "text-xs" : "text-sm"}`}>
+      <span className="shrink-0 text-slate-500">{label}</span>
+      <strong className={`${compact ? "truncate" : ""} min-w-0 text-navy-900`}>{value}</strong>
     </div>
   );
 }

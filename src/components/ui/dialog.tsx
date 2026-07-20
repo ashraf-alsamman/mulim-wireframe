@@ -2,7 +2,7 @@
 
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/cn";
@@ -13,7 +13,9 @@ export function Dialog({
   title,
   children,
   footer,
-  className
+  className,
+  bodyClassName,
+  contentStyle
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -21,16 +23,19 @@ export function Dialog({
   children: ReactNode;
   footer?: ReactNode;
   className?: string;
+  bodyClassName?: string;
+  contentStyle?: CSSProperties;
 }) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-[rgba(0,0,0,0.34)] backdrop-blur-[1px]" />
+        <DialogPrimitive.Overlay className="dialog-overlay fixed inset-0 z-40 bg-[rgba(0,0,0,0.34)] backdrop-blur-[1px]" />
         <DialogPrimitive.Content
           className={cn(
             "sketch-dialog fixed left-1/2 top-1/2 z-50 max-h-[88vh] w-[min(92vw,760px)] -translate-x-1/2 -translate-y-1/2 overflow-auto focus:outline-none",
             className
           )}
+          style={contentStyle}
         >
           <div className="flex items-center justify-between border-b-2 border-dashed border-[var(--muted-line)] p-5">
             <DialogPrimitive.Title className="text-base font-bold text-[var(--ink)]">{title}</DialogPrimitive.Title>
@@ -40,7 +45,7 @@ export function Dialog({
               </Button>
             </DialogPrimitive.Close>
           </div>
-          <div className="p-5">{children}</div>
+          <div className={cn("p-5", bodyClassName)}>{children}</div>
           {footer ? <div className="flex justify-end gap-2 border-t-2 border-dashed border-[var(--muted-line)] p-4">{footer}</div> : null}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

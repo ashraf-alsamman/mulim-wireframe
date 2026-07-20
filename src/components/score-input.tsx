@@ -1,6 +1,7 @@
 "use client";
 
 import type { CriterionId } from "@/types/demo";
+import { cn } from "@/utils/cn";
 
 export function ScoreInput({
   id,
@@ -8,6 +9,7 @@ export function ScoreInput({
   value,
   max,
   disabled,
+  compact = false,
   onChange
 }: {
   id: CriterionId;
@@ -15,12 +17,13 @@ export function ScoreInput({
   value: number;
   max: number;
   disabled?: boolean;
+  compact?: boolean;
   onChange: (id: CriterionId, value: number) => void;
 }) {
   return (
-    <div className="sketch-note p-4">
-      <div className="flex items-center justify-between gap-4">
-        <label htmlFor={id} className="font-bold text-[var(--ink-soft)]">
+    <div className={cn("sketch-note", compact ? "p-2.5" : "p-4")}>
+      <div className={cn("flex items-center justify-between", compact ? "gap-2" : "gap-4")}>
+        <label htmlFor={id} className={cn("font-bold text-[var(--ink-soft)]", compact && "text-sm leading-tight")}>
           {label}
         </label>
         <input
@@ -32,7 +35,7 @@ export function ScoreInput({
           value={value}
           disabled={disabled}
           onChange={(event) => onChange(id, Number(event.target.value))}
-          className="sketch-input h-9 w-20 px-2 text-center text-sm font-bold"
+          className={cn("sketch-input px-2 text-center font-bold", compact ? "h-8 w-14 text-xs" : "h-9 w-20 text-sm")}
         />
       </div>
       <input
@@ -44,7 +47,7 @@ export function ScoreInput({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(id, Number(event.target.value))}
-        className="mt-4 w-full accent-gulf-green"
+        className={cn("w-full accent-gulf-green", compact ? "mt-2" : "mt-4")}
       />
     </div>
   );
